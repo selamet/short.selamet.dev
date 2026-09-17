@@ -1,0 +1,55 @@
+name: Deploy
+
+# Runs only after the CI workflow succeeded on main, so a red build never ships.
+# workflow_dispatch allows a redeploy without a code change (for example after an
+# environment variable was edited on the server).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Two `docker compose up --build` runs in the same directory race over the image
+  # and the container names; one deploy at a time.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger the deploy on the host
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # The key is restricted on the host to a forced command that dispatches on
+          # this argument; it cannot open a shell.
+          ssh -i ~/.ssh/id_ed25519 "$DEPLOY_USER@$DEPLOY_HOST" short
+
+      - name: Wait for the new container to answer
+        env:
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+        run: |
+          for attempt in $(seq 1 30); do
+            body=$(curl -s -m 10 "$PUBLIC_URL/health/" || true)
+            if printf '%s' "$body" | grep -q '"status": "ok"'; then
+              echo "healthy after ${attempt} attempt(s): $body"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::/health/ never reported status ok — the deploy did not come up"
+          exit 1
