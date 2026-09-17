@@ -7,6 +7,6 @@
       {% csrf_token %}
       <select name="role" class="rounded-sm border border-line bg-surface-2 px-2 py-1"><option value="member" {% if m.role == 'member' %}selected{% endif %}>Member</option><option value="admin" {% if m.role == 'admin' %}selected{% endif %}>Admin</option></select>
     </form>
-    <form hx-post="{% url 'workspaces:member_remove' current_workspace.slug m.pk %}" hx-target="#member-{{ m.pk }}" hx-swap="outerHTML">{% csrf_token %}<button type="submit" class="text-danger underline">Remove</button></form>
+    <button type="button" hx-get="{% url 'workspaces:member_remove_confirm' current_workspace.slug m.pk %}" hx-target="#modal" class="text-danger underline">Remove</button>
   {% endif %}
 </li>

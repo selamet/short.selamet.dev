@@ -30,5 +30,20 @@
     if (message) toast(message, "success");
   });
 
+  function closeModal() {
+    const modal = document.getElementById("modal");
+    if (modal) modal.innerHTML = "";
+  }
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-modal-close]")) closeModal();
+  });
+
+  document.addEventListener("htmx:afterSwap", (event) => {
+    const modal = document.getElementById("modal");
+    const target = event.detail.target;
+    if (modal && target && !modal.contains(target)) closeModal();
+  });
+
   window.short = { toast, setTheme: (value) => root.setAttribute("data-theme", value) };
 })();

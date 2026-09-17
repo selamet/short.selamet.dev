@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
@@ -208,6 +209,23 @@ def member_role(request, slug, pk):
 
 
 @require_role(Role.OWNER, Role.ADMIN)
+@require_GET
+def member_remove_confirm(request, slug, pk):
+    target = get_object_or_404(
+        Membership.objects.select_related("user"), pk=pk, workspace=request.workspace
+    )
+    context = {
+        "title": "Remove member?",
+        "body": f"{target.user.get_short_name()} will immediately lose access to "
+        f"{request.workspace.name}.",
+        "action": reverse("workspaces:member_remove", args=[slug, pk]),
+        "target": f"#member-{pk}",
+        "confirm_label": "Remove",
+    }
+    return render(request, "partials/confirm.html", context)
+
+
+@require_role(Role.OWNER, Role.ADMIN)
 @require_POST
 def member_remove(request, slug, pk):
     target = get_object_or_404(Membership, pk=pk, workspace=request.workspace)
@@ -218,6 +236,20 @@ def member_remove(request, slug, pk):
     if request.headers.get("HX-Request"):
         return render(request, "workspaces/settings/partials/removed.html")
     return redirect("workspaces:settings_members", slug=slug)
+
+
+@require_role(Role.OWNER, Role.ADMIN)
+@require_GET
+def invitation_revoke_confirm(request, slug, pk):
+    invitation = get_object_or_404(Invitation, pk=pk, workspace=request.workspace)
+    context = {
+        "title": "Revoke invitation?",
+        "body": f"{invitation.email} will no longer be able to accept this invitation.",
+        "action": reverse("workspaces:invitation_revoke", args=[slug, pk]),
+        "target": f"#invitation-{pk}",
+        "confirm_label": "Revoke",
+    }
+    return render(request, "partials/confirm.html", context)
 
 
 @require_role(Role.OWNER, Role.ADMIN)

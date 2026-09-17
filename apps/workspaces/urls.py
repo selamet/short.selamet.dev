@@ -14,9 +14,19 @@ urlpatterns = [
     path("<slug:slug>/settings/members/", views.settings_members, name="settings_members"),
     path("<slug:slug>/settings/members/<int:pk>/role/", views.member_role, name="member_role"),
     path(
+        "<slug:slug>/settings/members/<int:pk>/remove/confirm/",
+        views.member_remove_confirm,
+        name="member_remove_confirm",
+    ),
+    path(
         "<slug:slug>/settings/members/<int:pk>/remove/",
         views.member_remove,
         name="member_remove",
+    ),
+    path(
+        "<slug:slug>/settings/invitations/<int:pk>/revoke/confirm/",
+        views.invitation_revoke_confirm,
+        name="invitation_revoke_confirm",
     ),
     path(
         "<slug:slug>/settings/invitations/<int:pk>/revoke/",

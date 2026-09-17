@@ -114,6 +114,75 @@ def test_invite_rate_limit_error_reaches_members_page(client, admin_membership, 
     assert not Invitation.objects.filter(email="second@example.com").exists()
 
 
+def test_member_remove_confirm_view_renders_for_admin(client, admin_membership, member_membership):
+    client.force_login(admin_membership.user)
+    response = client.get(url("member_remove_confirm", "acme-social", member_membership.pk))
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "Remove member?" in body
+    assert url("member_remove", "acme-social", member_membership.pk) in body
+    assert "data-modal-close" in body
+
+
+def test_member_remove_confirm_403_for_member(client, member_membership, admin_membership):
+    client.force_login(member_membership.user)
+    response = client.get(url("member_remove_confirm", "acme-social", admin_membership.pk))
+    assert response.status_code == 403
+
+
+def test_invitation_revoke_confirm_view_renders_for_admin(client, admin_membership):
+    services.invite(admin_membership, "x@example.com", Role.MEMBER)
+    invitation = Invitation.objects.get()
+    client.force_login(admin_membership.user)
+    response = client.get(url("invitation_revoke_confirm", "acme-social", invitation.pk))
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "Revoke invitation?" in body
+    assert url("invitation_revoke", "acme-social", invitation.pk) in body
+
+
+def test_invitation_revoke_confirm_403_for_member(client, member_membership, admin_membership):
+    services.invite(admin_membership, "x@example.com", Role.MEMBER)
+    invitation = Invitation.objects.get()
+    client.force_login(member_membership.user)
+    response = client.get(url("invitation_revoke_confirm", "acme-social", invitation.pk))
+    assert response.status_code == 403
+
+
+def test_member_and_invitation_rows_use_confirm_dialogs_not_direct_posts(
+    client, admin_membership, member_membership
+):
+    services.invite(admin_membership, "x@example.com", Role.MEMBER)
+    client.force_login(admin_membership.user)
+    body = client.get(url("settings_members")).content.decode()
+    assert f'hx-get="{url("member_remove_confirm", "acme-social", member_membership.pk)}"' in body
+    assert f'hx-post="{url("member_remove", "acme-social", member_membership.pk)}"' not in body
+    invitation = Invitation.objects.get()
+    assert f'hx-get="{url("invitation_revoke_confirm", "acme-social", invitation.pk)}"' in body
+    assert f'hx-post="{url("invitation_revoke", "acme-social", invitation.pk)}"' not in body
+
+
+def test_confirm_dialog_post_still_removes_member(client, admin_membership, member_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_remove", "acme-social", member_membership.pk), HTTP_HX_REQUEST="true"
+    )
+    assert response.status_code == 200
+    assert not Membership.objects.filter(pk=member_membership.pk).exists()
+
+
+def test_confirm_dialog_post_still_revokes_invitation(client, admin_membership):
+    services.invite(admin_membership, "x@example.com", Role.MEMBER)
+    invitation = Invitation.objects.get()
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("invitation_revoke", "acme-social", invitation.pk), HTTP_HX_REQUEST="true"
+    )
+    assert response.status_code == 200
+    invitation.refresh_from_db()
+    assert invitation.is_pending is False
+
+
 def test_change_role_and_remove(client, admin_membership, member_membership):
     client.force_login(admin_membership.user)
     response = client.post(

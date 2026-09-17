@@ -1,5 +1,5 @@
 <li id="invitation-{{ i.pk }}" class="flex flex-wrap items-center gap-3 px-4 py-3">
   <span class="mono flex-1 min-w-0">{{ i.email }}</span>
   <span class="text-[11.5px] text-ink-muted">{{ i.get_role_display }} · invited {{ i.created_at|timesince }} ago</span>
-  <form hx-post="{% url 'workspaces:invitation_revoke' current_workspace.slug i.pk %}" hx-target="#invitation-{{ i.pk }}" hx-swap="outerHTML">{% csrf_token %}<button type="submit" class="text-danger underline">Revoke</button></form>
+  <button type="button" hx-get="{% url 'workspaces:invitation_revoke_confirm' current_workspace.slug i.pk %}" hx-target="#modal" class="text-danger underline">Revoke</button>
 </li>
