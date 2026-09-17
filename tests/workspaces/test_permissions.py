@@ -3,17 +3,57 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.urls import reverse
 
-from apps.workspaces.permissions import PERMISSIONS, Role, can, require_role
+from apps.workspaces.permissions import PERMISSIONS, Role, can, matrix_rows, require_role
 
 
-def test_permission_matrix_matches_spec():
-    assert PERMISSIONS["links.manage"] == {Role.OWNER, Role.ADMIN, Role.MEMBER}
-    assert PERMISSIONS["analytics.view"] == {Role.OWNER, Role.ADMIN, Role.MEMBER}
-    assert PERMISSIONS["members.manage"] == {Role.OWNER, Role.ADMIN}
-    assert PERMISSIONS["api_keys.manage"] == {Role.OWNER, Role.ADMIN}
-    assert PERMISSIONS["workspace.settings"] == {Role.OWNER, Role.ADMIN}
-    assert PERMISSIONS["workspace.transfer"] == {Role.OWNER}
-    assert PERMISSIONS["workspace.delete"] == {Role.OWNER}
+def test_matrix_rows_match_spec():
+    # Per constraints.md (roles): member creates/edits links and views analytics;
+    # admin also manages members and API keys; owner also transfers ownership and
+    # deletes the workspace.
+    rows = {row["label"]: row for row in matrix_rows()}
+    assert len(rows) == len(PERMISSIONS)
+    assert rows["Create & edit links"] == {
+        "label": "Create & edit links",
+        "owner": True,
+        "admin": True,
+        "member": True,
+    }
+    assert rows["View analytics"] == {
+        "label": "View analytics",
+        "owner": True,
+        "admin": True,
+        "member": True,
+    }
+    assert rows["Invite & manage members"] == {
+        "label": "Invite & manage members",
+        "owner": True,
+        "admin": True,
+        "member": False,
+    }
+    assert rows["Manage API keys"] == {
+        "label": "Manage API keys",
+        "owner": True,
+        "admin": True,
+        "member": False,
+    }
+    assert rows["Edit workspace settings"] == {
+        "label": "Edit workspace settings",
+        "owner": True,
+        "admin": True,
+        "member": False,
+    }
+    assert rows["Transfer ownership"] == {
+        "label": "Transfer ownership",
+        "owner": True,
+        "admin": False,
+        "member": False,
+    }
+    assert rows["Delete workspace"] == {
+        "label": "Delete workspace",
+        "owner": True,
+        "admin": False,
+        "member": False,
+    }
 
 
 def test_can_uses_membership_role(member_membership, owner_membership):

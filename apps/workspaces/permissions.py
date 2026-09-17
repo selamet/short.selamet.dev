@@ -21,11 +21,37 @@ PERMISSIONS = {
     "workspace.delete": {Role.OWNER},
 }
 
+# Human labels for the permission matrix rendered on the members page, in display order.
+PERMISSION_LABELS = {
+    "links.manage": "Create & edit links",
+    "analytics.view": "View analytics",
+    "members.manage": "Invite & manage members",
+    "api_keys.manage": "Manage API keys",
+    "workspace.settings": "Edit workspace settings",
+    "workspace.transfer": "Transfer ownership",
+    "workspace.delete": "Delete workspace",
+}
+
 
 def can(membership, permission):
     if membership is None:
         return False
     return membership.role in PERMISSIONS[permission]
+
+
+def matrix_rows():
+    """The permission matrix as rendered rows, derived from PERMISSIONS so the two
+    never drift apart. Raises KeyError if a permission is missing its label, rather
+    than silently rendering an incomplete matrix."""
+    return [
+        {
+            "label": PERMISSION_LABELS[permission],
+            "owner": Role.OWNER in roles,
+            "admin": Role.ADMIN in roles,
+            "member": Role.MEMBER in roles,
+        }
+        for permission, roles in PERMISSIONS.items()
+    ]
 
 
 def get_membership(user, slug):

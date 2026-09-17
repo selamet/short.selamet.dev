@@ -13,7 +13,7 @@ from apps.core import ratelimit
 from . import services
 from .forms import DeleteForm, InviteForm, RoleForm, TransferForm, WorkspaceForm
 from .models import Invitation, Membership, Role
-from .permissions import PERMISSIONS, require_role
+from .permissions import matrix_rows, require_role
 
 
 @login_required
@@ -159,8 +159,7 @@ def _members_context(request, form=None):
         "invitations": request.workspace.invitations.filter(
             accepted_at__isnull=True, expires_at__gt=timezone.now()
         ),
-        "matrix": PERMISSIONS,
-        "roles": [Role.OWNER, Role.ADMIN, Role.MEMBER],
+        "matrix_rows": matrix_rows(),
     }
 
 

@@ -13,11 +13,9 @@
 <table class="mt-2 w-full text-left text-[12.5px]">
   <thead><tr class="text-[11px] uppercase tracking-wide text-ink-muted"><th class="py-2">Permission</th><th>Owner</th><th>Admin</th><th>Member</th></tr></thead>
   <tbody>
-    <tr><td class="py-2">Create &amp; edit links</td><td>✓</td><td>✓</td><td>✓</td></tr>
-    <tr><td class="py-2">View analytics</td><td>✓</td><td>✓</td><td>✓</td></tr>
-    <tr><td class="py-2">Invite &amp; manage members</td><td>✓</td><td>✓</td><td>—</td></tr>
-    <tr><td class="py-2">Manage API keys</td><td>✓</td><td>✓</td><td>—</td></tr>
-    <tr><td class="py-2">Delete or transfer workspace</td><td>✓</td><td>—</td><td>—</td></tr>
+    {% for row in matrix_rows %}
+    <tr><td class="py-2">{{ row.label }}</td><td>{% if row.owner %}✓{% else %}—{% endif %}</td><td>{% if row.admin %}✓{% else %}—{% endif %}</td><td>{% if row.member %}✓{% else %}—{% endif %}</td></tr>
+    {% endfor %}
   </tbody>
 </table>
 {% endblock %}

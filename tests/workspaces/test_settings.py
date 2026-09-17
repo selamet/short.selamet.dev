@@ -5,6 +5,7 @@ from django.urls import reverse
 from apps.accounts.models import User
 from apps.workspaces import services
 from apps.workspaces.models import Invitation, Membership, Role, Workspace
+from apps.workspaces.permissions import PERMISSIONS
 
 
 def url(name, slug="acme-social", *args):
@@ -60,7 +61,17 @@ def test_members_page_lists_members_and_matrix(client, owner_membership, member_
     client.force_login(owner_membership.user)
     body = client.get(url("settings_members")).content.decode()
     assert "member@example.com" in body and "owner@example.com" in body
-    assert "Delete or transfer workspace" in body
+    assert "Transfer ownership" in body
+    assert "Delete workspace" in body
+
+
+def test_members_page_permission_matrix_has_a_row_per_permission(
+    client, owner_membership, member_membership
+):
+    client.force_login(owner_membership.user)
+    body = client.get(url("settings_members")).content.decode()
+    table = body.split("Permissions</h2>")[1]
+    assert table.count("<tr") == len(PERMISSIONS) + 1  # + the header row
 
 
 def test_invite_from_members_page(client, admin_membership):
