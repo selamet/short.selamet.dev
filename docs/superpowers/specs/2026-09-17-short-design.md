@@ -52,7 +52,8 @@ short/
 │   ├── api/           # django-ninja routers, API key auth, v1 schemas
 │   └── core/          # shared mixins, base62, validators, GeoIP service
 ├── templates/         # includes partials/ for HTMX swaps
-├── static/            # Tailwind output, vendored HTMX and Chart.js
+├── assets/            # Tailwind input (assets/css/app.css), not served
+├── static/            # built CSS (git-ignored), vendored HTMX and Chart.js, app.js
 ├── extension/         # phase 2, separate spec
 ├── docs/
 ├── compose.yaml       # web, worker (production; the host's Caddy terminates TLS)
