@@ -91,9 +91,7 @@ CACHES = {
 
 TASKS = {
     "default": {
-        "BACKEND": env(
-            "TASKS_BACKEND", default="django.tasks.backends.immediate.ImmediateBackend"
-        ),
+        "BACKEND": env("TASKS_BACKEND", default="django.tasks.backends.immediate.ImmediateBackend"),
     }
 }
 
