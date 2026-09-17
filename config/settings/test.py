@@ -16,3 +16,7 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
 }
+
+# Serve static files from finders in tests; no collected STATIC_ROOT is needed.
+WHITENOISE_AUTOREFRESH = True
+WHITENOISE_USE_FINDERS = True
