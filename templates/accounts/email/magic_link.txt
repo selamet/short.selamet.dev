@@ -1,0 +1,9 @@
+Your sign-in link to {{ site_name }}
+
+Open this link to sign in. It works once and expires in {{ ttl_minutes }} minutes:
+
+{{ url }}
+
+Didn't request this? Ignore this email. Nothing happens unless the link is opened.
+
+Sent by your self-hosted {{ site_name }} instance · {{ short_domain }}
