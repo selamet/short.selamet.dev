@@ -4,11 +4,24 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      python-dependencies:
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: weekly
+    groups:
+      docker-images:
+        patterns: ["*"]
+    ignore:
+      # The Python version is a deliberate choice; bump it on purpose, not by bot.
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
