@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+@source "../../templates/**/*.html";
+@source "../../apps/**/*.py";
+
+@theme {
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --shadow-e1: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-e3: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+
+:root,
+:root[data-theme="light"] {
+  --bg: #e9e6e0;
+  --surface: #ffffff;
+  --surface-2: #f4f2ee;
+  --line: rgba(0, 0, 0, 0.14);
+  --ink: #1b1a18;
+  --ink-muted: #77736c;
+  --accent: #d8552a;
+  --accent-hover: #c04a22;
+  --danger: #b22020;
+  --ok: #2f6f4e;
+  --warn: #b8471f;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --bg: #141312;
+  --surface: #1b1a18;
+  --surface-2: #232120;
+  --line: rgba(255, 255, 255, 0.14);
+  --ink: #e9e6e0;
+  --ink-muted: #8d8880;
+  --accent: #ef6a3d;
+  --accent-hover: #f37d55;
+  --danger: #e06666;
+  --ok: #5bbd8c;
+  --warn: #e0884f;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    --bg: #141312;
+    --surface: #1b1a18;
+    --surface-2: #232120;
+    --line: rgba(255, 255, 255, 0.14);
+    --ink: #e9e6e0;
+    --ink-muted: #8d8880;
+    --accent: #ef6a3d;
+    --accent-hover: #f37d55;
+    --danger: #e06666;
+    --ok: #5bbd8c;
+    --warn: #e0884f;
+    color-scheme: dark;
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-ink font-sans text-[13px] antialiased;
+  }
+  .mono {
+    @apply font-mono;
+  }
+}

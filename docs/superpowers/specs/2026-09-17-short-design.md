@@ -52,7 +52,8 @@ short/
 │   ├── api/           # django-ninja routers, API key auth, v1 schemas
 │   └── core/          # shared mixins, base62, validators, GeoIP service
 ├── templates/         # includes partials/ for HTMX swaps
-├── static/            # Tailwind output, vendored HTMX and Chart.js
+├── assets/            # Tailwind input (assets/css/app.css), not served
+├── static/            # built CSS (git-ignored), vendored HTMX and Chart.js, app.js
 ├── extension/         # phase 2, separate spec
 ├── docs/
 ├── compose.yaml       # web, worker (production; the host's Caddy terminates TLS)
@@ -189,7 +190,7 @@ Total custom JS: roughly 100 lines. No bundler.
 - No browser tests in phase 1; Playwright arrives with the extension in phase 2.
 - Coverage target above 90% for services and redirects, measured in CI, not enforced.
 - Tooling: `uv`, `ruff` (lint + format), `pre-commit`, `django-environ`, `compose.dev.yaml` for local Postgres/Redis, `.env.example` documenting every variable.
-- CI (GitHub Actions): ruff, pytest with Postgres and Redis service containers, Docker build on every PR; image pushed to GHCR on merge to `main`.
+- CI (GitHub Actions): ruff, pytest with a Postgres service container (cache is LocMemCache in tests), Docker build on every PR; image pushed to GHCR on merge to `main`.
 
 ### Workflow
 - Every piece of work is a GitHub issue in English (context, scope, acceptance criteria), labeled `area:*`, `type:*`, `phase:*`, assigned to `selamet`.

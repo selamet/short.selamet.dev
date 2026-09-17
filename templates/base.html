@@ -1,0 +1,24 @@
+{% load static %}<!doctype html>
+<html lang="en" data-theme="{{ request.user.theme|default:'system' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+  {% block head %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  {% block body %}
+  <main class="mx-auto max-w-6xl px-4">{% block content %}{% endblock %}</main>
+  {% endblock %}
+  <div id="toasts" class="fixed bottom-4 right-4 flex flex-col gap-2" aria-live="polite"></div>
+  <div id="modal"></div>
+  <script src="{% static 'vendor/htmx.min.js' %}" nonce="{{ csp_nonce }}"></script>
+  <script src="{% static 'js/app.js' %}" nonce="{{ csp_nonce }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
