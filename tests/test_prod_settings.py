@@ -61,3 +61,9 @@ def test_prod_settings_reject_console_email_backend(monkeypatch):
 
     with pytest.raises(ImproperlyConfigured):
         _build_prod_settings(monkeypatch, env)
+
+
+def test_prod_settings_allow_loopback_hosts_for_health_probes(monkeypatch):
+    settings = _build_prod_settings(monkeypatch, PLACEHOLDER_ENV)
+
+    assert settings.ALLOWED_HOSTS == ["example.com", "127.0.0.1", "localhost"]

@@ -23,7 +23,7 @@ Early development. Follow the [issues](../../issues) for the roadmap and `docs/s
     uv run python manage.py migrate
     uv run python manage.py runserver
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow. Self-hosting docs arrive with the deployment issue.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow and [docs/self-hosting.md](docs/self-hosting.md) to run it in production.
 
 ## Stack
 
