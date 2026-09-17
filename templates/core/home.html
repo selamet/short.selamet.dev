@@ -6,5 +6,13 @@
   <h1 class="mt-4 text-[28px] font-semibold leading-[1.15] tracking-[-0.025em]">Short links built for people who post all day.</h1>
   <p class="mt-4 max-w-xl text-ink-muted">Open-source, self-hostable URL shortener for social media teams. Landing page and dashboard arrive in later issues.</p>
   <p class="mt-8 mono text-ink-muted">{{ SHORT_DOMAIN }}»abc123</p>
+  <div class="mt-8 flex items-center gap-4">
+    {% if user.is_authenticated %}
+      <span class="text-ink-muted">Signed in as <span class="mono text-ink">{{ user.email }}</span></span>
+      <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="rounded-md border border-line px-3 py-2 font-medium hover:bg-surface-2">Sign out</button></form>
+    {% else %}
+      <a href="{% url 'accounts:login' %}" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Sign in</a>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}

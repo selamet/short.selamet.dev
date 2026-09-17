@@ -1,8 +1,9 @@
 import time
 
 from django.conf import settings
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout
 from django.core.cache import cache
-from django.http import HttpResponseNotFound
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
@@ -100,5 +101,22 @@ def resend(request):
     return redirect("accounts:check_inbox")
 
 
+@require_http_methods(["GET", "POST"])
 def verify(request, token):
-    return HttpResponseNotFound()
+    if request.method == "GET":
+        # Consuming on POST keeps email link scanners (which only GET) from burning the token.
+        return render(request, "accounts/verify.html", {"token": token})
+    try:
+        user = services.consume_magic_link(token)
+    except services.InvalidMagicLink:
+        return render(request, "accounts/link_expired.html", status=410)
+    auth_login(request, user)
+    request.session.pop(PENDING_EMAIL_SESSION_KEY, None)
+    next_url = request.session.pop(LOGIN_NEXT_SESSION_KEY, "") or settings.LOGIN_REDIRECT_URL
+    return redirect(next_url)
+
+
+@require_POST
+def logout(request):
+    auth_logout(request)
+    return redirect("accounts:login")

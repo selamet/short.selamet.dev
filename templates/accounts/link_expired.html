@@ -1,0 +1,8 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Link expired · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-danger" aria-hidden="true">» ⊘</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">This link no longer works</h1>
+<p class="mt-2 text-ink-muted">Sign-in links expire after 15 minutes and can only be used once.</p>
+<a href="{% url 'accounts:login' %}" class="mt-6 inline-block rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Send a new link</a>
+{% endblock %}
