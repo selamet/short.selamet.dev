@@ -185,7 +185,9 @@ def settings_members(request, slug):
             messages.success(request, "Invitation sent.")
             return redirect("workspaces:settings_members", slug=slug)
     if request.method == "POST" and is_hx:
-        return render(request, "workspaces/settings/partials/invite_form.html", {"form": form})
+        return render(
+            request, "workspaces/settings/partials/invite_form.html", {"form": form}, status=422
+        )
     return render(request, "workspaces/settings/members.html", _members_context(request, form))
 
 
@@ -201,6 +203,10 @@ def member_role(request, slug, pk):
     try:
         services.change_role(request.membership, target, form.cleaned_data["role"])
     except services.InvalidOperation as error:
+        if request.headers.get("HX-Request"):
+            return render(
+                request, "workspaces/settings/partials/member_row.html", {"m": target}, status=422
+            )
         return HttpResponseBadRequest(str(error))
     if request.headers.get("HX-Request"):
         return render(request, "workspaces/settings/partials/member_row.html", {"m": target})
@@ -227,10 +233,16 @@ def member_remove_confirm(request, slug, pk):
 @require_role(Role.OWNER, Role.ADMIN)
 @require_POST
 def member_remove(request, slug, pk):
-    target = get_object_or_404(Membership, pk=pk, workspace=request.workspace)
+    target = get_object_or_404(
+        Membership.objects.select_related("user"), pk=pk, workspace=request.workspace
+    )
     try:
         services.remove_member(request.membership, target)
     except services.InvalidOperation as error:
+        if request.headers.get("HX-Request"):
+            return render(
+                request, "workspaces/settings/partials/member_row.html", {"m": target}, status=422
+            )
         return HttpResponseBadRequest(str(error))
     if request.headers.get("HX-Request"):
         return render(request, "workspaces/settings/partials/removed.html")

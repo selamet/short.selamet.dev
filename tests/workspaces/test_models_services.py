@@ -108,6 +108,18 @@ def test_only_owner_transfers(admin_membership, member_membership):
         services.transfer_ownership(admin_membership, member_membership)
 
 
+def test_transfer_raises_invalid_operation_when_actor_already_demoted(
+    owner_membership, admin_membership
+):
+    # Simulate a concurrent change that demoted the actor after the view fetched
+    # its stale in-memory membership but before this call took the row lock.
+    Membership.objects.filter(pk=owner_membership.pk).update(role=Role.ADMIN)
+    with pytest.raises(services.InvalidOperation):
+        services.transfer_ownership(owner_membership, admin_membership)
+    admin_membership.refresh_from_db()
+    assert admin_membership.role == Role.ADMIN
+
+
 def test_delete_workspace_requires_owner_and_matching_slug(owner_membership, admin_membership):
     with pytest.raises(services.PermissionDenied):
         services.delete_workspace(admin_membership, confirm_slug="acme-social")

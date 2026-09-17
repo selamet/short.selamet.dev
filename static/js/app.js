@@ -30,6 +30,17 @@
     if (message) toast(message, "success");
   });
 
+  // The vendored htmx build has no configurable responseHandling for a 422: by
+  // default any 4xx is treated as an error and skipped. Views use 422 for
+  // validation failures they still want swapped back into the page, so swap it
+  // like a normal response instead of treating it as a request failure.
+  document.addEventListener("htmx:beforeSwap", (event) => {
+    if (event.detail.xhr && event.detail.xhr.status === 422) {
+      event.detail.shouldSwap = true;
+      event.detail.isError = false;
+    }
+  });
+
   function closeModal() {
     const modal = document.getElementById("modal");
     if (modal) modal.innerHTML = "";

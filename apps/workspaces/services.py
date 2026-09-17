@@ -133,11 +133,38 @@ def transfer_ownership(owner, target):
     _same_workspace(owner, target)
     if owner.pk == target.pk:
         raise InvalidOperation("Choose another member.")
-    # Demote first so the single-owner constraint never sees two owners.
-    owner.role = Role.ADMIN
-    owner.save(update_fields=["role"])
-    target.role = Role.OWNER
-    target.save(update_fields=["role"])
+    # Lock both rows so a concurrent transfer or removal can't slip in between the
+    # check below and the writes that follow, then re-read them under the lock:
+    # the caller's in-memory objects may already be stale.
+    locked = {
+        membership.pk: membership
+        for membership in Membership.objects.select_for_update().filter(
+            pk__in=[owner.pk, target.pk]
+        )
+    }
+    locked_owner = locked.get(owner.pk)
+    locked_target = locked.get(target.pk)
+    stale = (
+        locked_owner is None
+        or locked_target is None
+        or locked_owner.role != Role.OWNER
+        or locked_owner.workspace_id != locked_target.workspace_id
+    )
+    if stale:
+        raise InvalidOperation(
+            "Ownership changed while you were transferring. Reload and try again."
+        )
+    try:
+        with transaction.atomic():
+            # Demote first so the single-owner constraint never sees two owners.
+            locked_owner.role = Role.ADMIN
+            locked_owner.save(update_fields=["role"])
+            locked_target.role = Role.OWNER
+            locked_target.save(update_fields=["role"])
+    except IntegrityError:
+        raise InvalidOperation(
+            "Ownership changed while you were transferring. Reload and try again."
+        ) from None
 
 
 def delete_workspace(owner, confirm_slug):

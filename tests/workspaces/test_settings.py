@@ -96,7 +96,7 @@ def test_invite_existing_member_shows_error(client, admin_membership, member_mem
         {"email": member_membership.user.email, "role": "member"},
         HTTP_HX_REQUEST="true",
     )
-    assert response.status_code == 200
+    assert response.status_code == 422
     body = response.content.decode()
     assert "already a member" in body
     assert "Permissions" not in body
@@ -219,6 +219,33 @@ def test_owner_row_cannot_be_changed(client, admin_membership, owner_membership)
     assert response.status_code == 400
     owner_membership.refresh_from_db()
     assert owner_membership.role == Role.OWNER
+
+
+def test_member_role_htmx_error_returns_422_with_unchanged_row(
+    client, admin_membership, owner_membership
+):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_role", "acme-social", owner_membership.pk),
+        {"role": "member"},
+        HTTP_HX_REQUEST="true",
+    )
+    assert response.status_code == 422
+    assert "Owner" in response.content.decode()
+    owner_membership.refresh_from_db()
+    assert owner_membership.role == Role.OWNER
+
+
+def test_member_remove_htmx_error_returns_422_with_unchanged_row(
+    client, admin_membership, owner_membership
+):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_remove", "acme-social", owner_membership.pk), HTTP_HX_REQUEST="true"
+    )
+    assert response.status_code == 422
+    assert "Owner" in response.content.decode()
+    assert Membership.objects.filter(pk=owner_membership.pk).exists()
 
 
 def test_revoke_invitation(client, admin_membership):
