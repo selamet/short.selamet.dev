@@ -37,6 +37,9 @@ INVITE_RATE_PER_WORKSPACE = env.int("INVITE_RATE_PER_WORKSPACE", default=20)
 INVITE_RATE_PER_WORKSPACE_WINDOW = env.int("INVITE_RATE_PER_WORKSPACE_WINDOW", default=3600)
 INVITE_RATE_PER_USER = env.int("INVITE_RATE_PER_USER", default=30)
 INVITE_RATE_PER_USER_WINDOW = env.int("INVITE_RATE_PER_USER_WINDOW", default=3600)
+# Slug availability check rate limit, enforced in apps.workspaces.views.check_slug.
+SLUG_CHECK_RATE = env.int("SLUG_CHECK_RATE", default=60)
+SLUG_CHECK_RATE_WINDOW = env.int("SLUG_CHECK_RATE_WINDOW", default=60)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

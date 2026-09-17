@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
@@ -5,6 +6,8 @@ from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
+
+from apps.core import ratelimit
 
 from . import services
 from .forms import DeleteForm, InviteForm, RoleForm, TransferForm, WorkspaceForm
@@ -49,6 +52,15 @@ def create(request):
 @login_required
 @require_GET
 def check_slug(request):
+    allowed = ratelimit.hit(
+        "slug-check",
+        str(request.user.pk),
+        limit=settings.SLUG_CHECK_RATE,
+        window=settings.SLUG_CHECK_RATE_WINDOW,
+    )
+    if not allowed:
+        context = {"state": "invalid", "message": "Too many checks. Slow down."}
+        return render(request, "workspaces/partials/slug_check.html", context, status=429)
     try:
         slug = services.validate_slug(request.GET.get("slug", ""))
     except ValidationError as error:

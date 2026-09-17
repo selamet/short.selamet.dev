@@ -86,6 +86,16 @@ def test_check_slug_partial(client, user, workspace):
     assert "reserved" in bad.content.decode()
 
 
+def test_check_slug_is_rate_limited(client, user):
+    client.force_login(user)
+    for _ in range(60):
+        response = client.get(reverse("workspaces:check_slug") + "?slug=fresh-brand")
+        assert response.status_code == 200
+    blocked = client.get(reverse("workspaces:check_slug") + "?slug=fresh-brand")
+    assert blocked.status_code == 429
+    assert "Too many checks" in blocked.content.decode()
+
+
 def test_dashboard_renders_guided_empty_state_for_members(client, workspace, member_membership):
     client.force_login(member_membership.user)
     response = client.get(reverse("workspaces:dashboard", args=["acme-social"]))
