@@ -18,6 +18,7 @@
 - Rate limits (through Django's cache API only): 3 links per email per 10 minutes, 20 per IP per hour; resend cooldown 45 seconds.
 - Never reveal whether an email has an account: the same "check your inbox" page for everyone.
 - IPs are stored only as a salted hash (daily salt kept in the cache).
+- `client_ip` resolves the address from `TRUSTED_PROXY_HOPS` (env, default 1): the trustworthy `X-Forwarded-For` entry is the one `hops` positions from the end, since anything before it is client-supplied and must be ignored to keep rate limits from being spoofed.
 - Templates extend `templates/base.html`; inline `<script>` tags carry `nonce="{{ csp_nonce }}"`; no native `alert/confirm`.
 - Email: table-based HTML, inline styles, 560px, no images, plus a plain-text alternative carrying the same URL.
 - Tests: `uv run pytest`, 0 warnings; ruff and pre-commit clean; `makemigrations --check` clean.
@@ -81,8 +82,26 @@ from django.test import RequestFactory
 from apps.core.http import client_ip
 
 
-def test_client_ip_prefers_first_forwarded_for_entry():
-    request = RequestFactory().get("/", HTTP_X_FORWARDED_FOR="203.0.113.9, 10.0.0.2", REMOTE_ADDR="10.0.0.1")
+def test_client_ip_ignores_client_supplied_forwarded_entries():
+    request = RequestFactory().get(
+        "/", HTTP_X_FORWARDED_FOR="1.2.3.4, 203.0.113.9", REMOTE_ADDR="10.0.0.1"
+    )
+    assert client_ip(request) == "203.0.113.9"
+
+
+def test_client_ip_with_zero_hops_uses_remote_addr(settings):
+    settings.TRUSTED_PROXY_HOPS = 0
+    request = RequestFactory().get(
+        "/", HTTP_X_FORWARDED_FOR="1.2.3.4, 203.0.113.9", REMOTE_ADDR="10.0.0.1"
+    )
+    assert client_ip(request) == "10.0.0.1"
+
+
+def test_client_ip_with_two_hops(settings):
+    settings.TRUSTED_PROXY_HOPS = 2
+    request = RequestFactory().get(
+        "/", HTTP_X_FORWARDED_FOR="1.2.3.4, 203.0.113.9, 10.0.0.2", REMOTE_ADDR="10.0.0.1"
+    )
     assert client_ip(request) == "203.0.113.9"
 
 
@@ -199,11 +218,21 @@ Expected: import errors (`ModuleNotFoundError`) for the new modules.
 
 `apps/core/http.py`:
 ```python
+from django.conf import settings
+
+
 def client_ip(request):
-    """Best-effort client address behind the reverse proxy (first X-Forwarded-For hop)."""
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Client address behind TRUSTED_PROXY_HOPS reverse proxies.
+
+    Proxies append the peer address to X-Forwarded-For, so the trustworthy entry is the
+    one `hops` positions from the end; anything before it is client-supplied and ignored.
+    """
+    hops = settings.TRUSTED_PROXY_HOPS
+    parts = [
+        p.strip() for p in request.META.get("HTTP_X_FORWARDED_FOR", "").split(",") if p.strip()
+    ]
+    if hops and len(parts) >= hops:
+        return parts[-hops]
     return request.META.get("REMOTE_ADDR", "")
 ```
 
