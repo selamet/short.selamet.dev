@@ -2,7 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from .models import User
+from .models import MagicLink, User
 
 
 class UserCreationForm(forms.ModelForm):
@@ -36,3 +36,14 @@ class UserAdmin(BaseUserAdmin):
         ("Dates", {"fields": ("last_login", "date_joined")}),
     )
     add_fieldsets = ((None, {"fields": ("email",)}),)
+
+
+@admin.register(MagicLink)
+class MagicLinkAdmin(admin.ModelAdmin):
+    list_display = ("user", "created_at", "expires_at", "used_at")
+    list_select_related = ("user",)
+    readonly_fields = ("user", "token_hash", "expires_at", "used_at", "ip_hash", "created_at")
+    search_fields = ("user__email",)
+
+    def has_add_permission(self, request):
+        return False

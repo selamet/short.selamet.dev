@@ -19,6 +19,11 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 SHORT_DOMAIN = env("SHORT_DOMAIN", default="localhost:8000")
 SITE_NAME = "short"
 
+# Absolute origin used in emails and other links generated outside a request.
+SITE_URL = env("SITE_URL", default=f"http://{SHORT_DOMAIN}")
+MAGIC_LINK_TTL_MINUTES = 15
+MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 45
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
