@@ -1,0 +1,31 @@
+{% extends "workspaces/settings/_base.html" %}
+{% block settings %}
+<section class="rounded-lg border border-line bg-surface p-6">
+  <h2 class="text-[15px] font-semibold">Transfer ownership</h2>
+  <p class="mt-1 text-ink-muted">Hand the workspace to another member. You stay on as an admin.</p>
+  {% if candidates %}
+  <form method="post" action="{% url 'workspaces:transfer' current_workspace.slug %}" class="mt-4 flex flex-wrap items-center gap-3">
+    {% csrf_token %}
+    <select name="membership" class="rounded-sm border border-line bg-surface-2 px-3 py-2">{% for m in candidates %}<option value="{{ m.pk }}">{{ m.user.email }} ({{ m.get_role_display }})</option>{% endfor %}</select>
+    <button type="submit" class="rounded-md border border-line px-4 py-2 font-medium hover:bg-surface-2">Transfer</button>
+  </form>
+  {% else %}<p class="mt-4 text-ink-muted">Invite someone first.</p>{% endif %}
+  {% if transfer_error %}<p class="mt-2 text-danger" role="alert">{{ transfer_error }}</p>{% endif %}
+</section>
+<section class="mt-6 rounded-lg border border-danger bg-surface p-6">
+  <h2 class="text-[15px] font-semibold text-danger">Delete workspace</h2>
+  <p class="mt-1 text-ink-muted">All links stop redirecting immediately and all click history is erased. Type <span class="mono text-ink">{{ current_workspace.slug }}</span> to confirm.</p>
+  <form method="post" action="{% url 'workspaces:delete' current_workspace.slug %}" class="mt-4 flex flex-wrap items-center gap-3" novalidate>
+    {% csrf_token %}
+    <input name="confirm_slug" id="confirm-slug" placeholder="{{ current_workspace.slug }}" autocomplete="off" class="mono rounded-sm border border-line bg-surface-2 px-3 py-2" data-expected="{{ current_workspace.slug }}">
+    <button type="submit" id="delete-button" class="rounded-md bg-danger px-4 py-2 font-semibold text-white disabled:opacity-50" disabled>Delete workspace</button>
+    {% if form.confirm_slug.errors %}<span class="w-full text-danger" role="alert">{{ form.confirm_slug.errors.0 }}</span>{% endif %}
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+  const input = document.getElementById("confirm-slug"), button = document.getElementById("delete-button");
+  input.addEventListener("input", () => { button.disabled = input.value.trim() !== input.dataset.expected; });
+</script>
+{% endblock %}

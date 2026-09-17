@@ -1,0 +1,8 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Wrong account · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-danger" aria-hidden="true">» ⊘</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">This invitation is for a different address</h1>
+<p class="mt-2 text-ink-muted">This invitation was sent to <span class="mono text-ink">{{ invitation.email }}</span>, but you’re signed in as <span class="mono text-ink">{{ user.email }}</span>. Sign in as the invited address to accept it.</p>
+<form method="post" action="{% url 'accounts:logout' %}" class="mt-6">{% csrf_token %}<button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Sign out and use that address</button></form>
+{% endblock %}

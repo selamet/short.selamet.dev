@@ -26,11 +26,20 @@ SITE_URL = env("SITE_URL", default=f"http://{SHORT_DOMAIN}")
 TRUSTED_PROXY_HOPS = env.int("TRUSTED_PROXY_HOPS", default=1)
 MAGIC_LINK_TTL_MINUTES = 15
 MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 45
+INVITATION_TTL_DAYS = 7
 # Magic link request rate limits, enforced in apps.accounts.services.request_magic_link.
 MAGIC_LINK_RATE_PER_EMAIL = env.int("MAGIC_LINK_RATE_PER_EMAIL", default=3)
 MAGIC_LINK_RATE_PER_EMAIL_WINDOW = env.int("MAGIC_LINK_RATE_PER_EMAIL_WINDOW", default=600)
 MAGIC_LINK_RATE_PER_IP = env.int("MAGIC_LINK_RATE_PER_IP", default=20)
 MAGIC_LINK_RATE_PER_IP_WINDOW = env.int("MAGIC_LINK_RATE_PER_IP_WINDOW", default=3600)
+# Workspace invitation rate limits, enforced in apps.workspaces.services.invite.
+INVITE_RATE_PER_WORKSPACE = env.int("INVITE_RATE_PER_WORKSPACE", default=20)
+INVITE_RATE_PER_WORKSPACE_WINDOW = env.int("INVITE_RATE_PER_WORKSPACE_WINDOW", default=3600)
+INVITE_RATE_PER_USER = env.int("INVITE_RATE_PER_USER", default=30)
+INVITE_RATE_PER_USER_WINDOW = env.int("INVITE_RATE_PER_USER_WINDOW", default=3600)
+# Slug availability check rate limit, enforced in apps.workspaces.views.check_slug.
+SLUG_CHECK_RATE = env.int("SLUG_CHECK_RATE", default=60)
+SLUG_CHECK_RATE_WINDOW = env.int("SLUG_CHECK_RATE_WINDOW", default=60)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -78,6 +87,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.core.context_processors.site",
+                "apps.workspaces.context_processors.workspace",
             ],
         },
     },

@@ -1,0 +1,8 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Invitation invalid · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-danger" aria-hidden="true">» ⊘</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">This invitation is no longer valid</h1>
+<p class="mt-2 text-ink-muted">Invitations expire after 7 days and can only be used once. Ask the workspace admin to send a new one.</p>
+<a href="{% url 'workspaces:index' %}" class="mt-6 inline-block rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Go to your workspaces</a>
+{% endblock %}

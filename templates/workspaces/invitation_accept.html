@@ -1,0 +1,12 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Accept invite · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-accent" aria-hidden="true">» +</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">{{ invitation.invited_by.get_short_name|default:SITE_NAME }} invited you to {{ invitation.workspace.name }}</h1>
+<p class="mt-2 text-ink-muted">You’ll join as <span class="font-medium text-ink">{{ invitation.get_role_display }}</span>{% if invitation.role == "member" %} — you can create and edit links, but not manage members or API keys.{% else %} — you can also manage members and API keys.{% endif %}</p>
+<div class="mt-6 flex gap-3">
+  <form method="post" action="{% url 'workspaces:invitation_accept' token %}">{% csrf_token %}<button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Accept invite</button></form>
+  <form method="post" action="{% url 'workspaces:invitation_decline' token %}">{% csrf_token %}<button type="submit" class="rounded-md border border-line px-4 py-2 font-medium hover:bg-surface-2">Decline</button></form>
+</div>
+<p class="mt-6 text-[11.5px] text-ink-muted">Signed in as <span class="mono">{{ user.email }}</span> · <form method="post" action="{% url 'accounts:logout' %}" class="inline">{% csrf_token %}<button type="submit" class="underline">use a different account</button></form></p>
+{% endblock %}

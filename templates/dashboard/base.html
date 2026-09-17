@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="flex min-h-screen">
+  <aside class="hidden w-60 shrink-0 flex-col border-r border-line bg-surface md:flex">
+    <div class="px-4 py-4">
+      <a href="{% url 'workspaces:index' %}" class="mono text-accent">»</a>
+      {% if current_workspace %}
+      <details class="mt-3">
+        <summary class="cursor-pointer list-none rounded-md border border-line px-3 py-2 font-medium">{{ current_workspace.name }}</summary>
+        <ul class="mt-1 rounded-md border border-line bg-surface shadow-e1">
+          {% for m in memberships %}<li><a class="block px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:dashboard' m.workspace.slug %}">{{ m.workspace.name }}</a></li>{% endfor %}
+          <li><a class="block px-3 py-2 text-ink-muted hover:bg-surface-2" href="{% url 'workspaces:create' %}">+ New workspace</a></li>
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+    {% if current_workspace %}
+    <nav class="flex flex-col gap-1 px-2" aria-label="Workspace">
+      <a class="rounded-md px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:dashboard' current_workspace.slug %}">Links</a>
+      <a class="rounded-md px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:settings_general' current_workspace.slug %}">Settings</a>
+      {% block nav_extra %}{% endblock %}
+    </nav>
+    {% endif %}
+    <div class="mt-auto flex items-center justify-between px-4 py-4 text-[11.5px] text-ink-muted">
+      <span class="mono truncate">{{ user.email }}</span>
+      <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button class="underline" type="submit">Sign out</button></form>
+    </div>
+  </aside>
+  <main class="min-w-0 flex-1 px-4 py-6 md:px-8">
+    {% if messages %}{% for message in messages %}<div class="mb-4 rounded-md border border-line bg-surface px-3 py-2 {% if message.tags == 'error' %}text-danger border-danger{% endif %}" role="status">{{ message }}</div>{% endfor %}{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% endblock %}

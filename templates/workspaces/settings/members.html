@@ -1,0 +1,21 @@
+{% extends "workspaces/settings/_base.html" %}
+{% block settings %}
+{% include "workspaces/settings/partials/invite_form.html" %}
+
+<h2 class="mt-8 text-[15px] font-semibold">Members</h2>
+<ul class="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
+  {% for m in members %}{% include "workspaces/settings/partials/member_row.html" %}{% endfor %}
+</ul>
+
+{% include "workspaces/settings/partials/invitation_list.html" %}
+
+<h2 class="mt-8 text-[15px] font-semibold">Permissions</h2>
+<table class="mt-2 w-full text-left text-[12.5px]">
+  <thead><tr class="text-[11px] uppercase tracking-wide text-ink-muted"><th class="py-2">Permission</th><th>Owner</th><th>Admin</th><th>Member</th></tr></thead>
+  <tbody>
+    {% for row in matrix_rows %}
+    <tr><td class="py-2">{{ row.label }}</td><td>{% if row.owner %}✓{% else %}—{% endif %}</td><td>{% if row.admin %}✓{% else %}—{% endif %}</td><td>{% if row.member %}✓{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

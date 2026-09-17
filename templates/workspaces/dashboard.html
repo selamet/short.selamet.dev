@@ -1,0 +1,15 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{{ current_workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h1 class="text-[20px] font-semibold">{{ current_workspace.name }}</h1>
+<section class="mt-6 rounded-lg border border-line bg-surface p-6">
+  <p class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Guided empty dashboard</p>
+  <h2 class="mt-2 text-[15px] font-semibold">Three steps to your first link</h2>
+  <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+    <li class="rounded-md border border-line p-4"><span class="mono text-accent">1</span><p class="mt-2 font-medium">Paste a destination URL</p><p class="text-ink-muted">We fetch the title, favicon and social card automatically.</p></li>
+    <li class="rounded-md border border-line p-4"><span class="mono text-ink-muted">2</span><p class="mt-2 font-medium">Pick a preset</p><p class="text-ink-muted">Instagram bio, TikTok, newsletter — UTMs are filled for you.</p></li>
+    <li class="rounded-md border border-line p-4"><span class="mono text-ink-muted">3</span><p class="mt-2 font-medium">Copy and post it</p><p class="text-ink-muted">Clicks start showing in analytics within seconds.</p></li>
+  </ol>
+  <p class="mt-6 text-ink-muted">Link creation arrives with the next release.</p>
+</section>
+{% endblock %}
