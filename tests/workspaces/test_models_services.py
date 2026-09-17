@@ -22,14 +22,14 @@ def test_workspace_timezone_validator_rejects_bad_value(db):
 
 def test_create_workspace_rejects_invalid_timezone(owner):
     with pytest.raises(ValidationError):
-        services.create_workspace(owner, name="Acme", slug="acme-x", timezone="Mars/Olympus")
+        services.create_workspace(owner, name="Acme", slug="acme-x", tz="Mars/Olympus")
     assert not Workspace.objects.exists()
 
 
 def test_update_workspace_rejects_invalid_timezone(owner_membership):
     with pytest.raises(ValidationError):
         services.update_workspace(
-            owner_membership, name="Acme Social", slug="acme-social", timezone="Mars/Olympus"
+            owner_membership, name="Acme Social", slug="acme-social", tz="Mars/Olympus"
         )
     owner_membership.workspace.refresh_from_db()
     assert owner_membership.workspace.timezone == "UTC"
@@ -78,8 +78,13 @@ def test_admin_can_change_member_role_but_not_owner(
 
 
 def test_member_cannot_change_roles(member_membership, admin_membership):
-    with pytest.raises(services.PermissionDenied):
+    with pytest.raises(services.RoleRequired):
         services.change_role(member_membership, admin_membership, Role.MEMBER)
+
+
+def test_change_role_rejects_self(admin_membership):
+    with pytest.raises(services.InvalidOperation):
+        services.change_role(admin_membership, admin_membership, Role.MEMBER)
 
 
 def test_remove_member_rules(owner_membership, admin_membership, member_membership):
@@ -89,6 +94,12 @@ def test_remove_member_rules(owner_membership, admin_membership, member_membersh
     assert not Membership.objects.filter(pk=member_membership.pk).exists()
     with pytest.raises(services.InvalidOperation):
         services.remove_member(owner_membership, owner_membership)
+
+
+def test_remove_member_rejects_self(admin_membership):
+    with pytest.raises(services.InvalidOperation):
+        services.remove_member(admin_membership, admin_membership)
+    assert Membership.objects.filter(pk=admin_membership.pk).exists()
 
 
 def test_transfer_ownership_swaps_roles(owner_membership, admin_membership):
@@ -104,7 +115,7 @@ def test_transfer_ownership_swaps_roles(owner_membership, admin_membership):
 
 
 def test_only_owner_transfers(admin_membership, member_membership):
-    with pytest.raises(services.PermissionDenied):
+    with pytest.raises(services.RoleRequired):
         services.transfer_ownership(admin_membership, member_membership)
 
 
@@ -121,7 +132,7 @@ def test_transfer_raises_invalid_operation_when_actor_already_demoted(
 
 
 def test_delete_workspace_requires_owner_and_matching_slug(owner_membership, admin_membership):
-    with pytest.raises(services.PermissionDenied):
+    with pytest.raises(services.RoleRequired):
         services.delete_workspace(admin_membership, confirm_slug="acme-social")
     with pytest.raises(services.InvalidOperation):
         services.delete_workspace(owner_membership, confirm_slug="wrong")

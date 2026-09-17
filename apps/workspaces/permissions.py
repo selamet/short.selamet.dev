@@ -60,7 +60,7 @@ def get_membership(user, slug):
         return None
     return (
         Membership.objects.select_related("workspace", "user")
-        .filter(workspace__slug=slug, user=user)
+        .filter(workspace__slug__iexact=slug, user=user)
         .first()
     )
 

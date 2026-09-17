@@ -3,7 +3,14 @@ from django.http import HttpResponse
 from django.test import RequestFactory
 from django.urls import reverse
 
-from apps.workspaces.permissions import PERMISSIONS, Role, can, matrix_rows, require_role
+from apps.workspaces.permissions import (
+    PERMISSIONS,
+    Role,
+    can,
+    get_membership,
+    matrix_rows,
+    require_role,
+)
 
 
 def test_matrix_rows_match_spec():
@@ -61,6 +68,11 @@ def test_can_uses_membership_role(member_membership, owner_membership):
     assert can(member_membership, "members.manage") is False
     assert can(owner_membership, "workspace.delete") is True
     assert can(None, "links.manage") is False
+
+
+def test_get_membership_matches_slug_case_insensitively(member_membership):
+    assert get_membership(member_membership.user, "Acme-Social") == member_membership
+    assert get_membership(member_membership.user, "ACME-SOCIAL") == member_membership
 
 
 @require_role(Role.OWNER, Role.ADMIN)

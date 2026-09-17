@@ -41,7 +41,7 @@ def create(request):
                 request.user,
                 name=form.cleaned_data["name"],
                 slug=form.cleaned_data["slug"],
-                timezone=form.cleaned_data["timezone"],
+                tz=form.cleaned_data["timezone"],
             )
         except ValidationError as error:
             form.add_error("slug", error.messages[0])
@@ -142,7 +142,12 @@ def settings_general(request, slug):
     form = WorkspaceForm(request.POST or None, initial=initial, instance=workspace)
     if request.method == "POST" and form.is_valid():
         try:
-            services.update_workspace(request.membership, **form.cleaned_data)
+            services.update_workspace(
+                request.membership,
+                name=form.cleaned_data["name"],
+                slug=form.cleaned_data["slug"],
+                tz=form.cleaned_data["timezone"],
+            )
         except ValidationError as error:
             form.add_error("slug", error.messages[0])
         else:

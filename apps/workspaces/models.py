@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
+from django.utils import timezone
 
 
 class Role(models.TextChoices):
@@ -82,6 +83,4 @@ class Invitation(models.Model):
 
     @property
     def is_pending(self):
-        from django.utils import timezone
-
         return self.accepted_at is None and self.expires_at > timezone.now()

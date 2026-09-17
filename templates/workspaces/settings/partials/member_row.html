@@ -2,6 +2,8 @@
   <span class="flex-1 min-w-0"><span class="font-medium">{{ m.user.get_short_name }}</span> <span class="mono text-ink-muted">{{ m.user.email }}</span></span>
   {% if m.role == 'owner' %}
     <span class="rounded-full border border-line px-2 py-1 text-[11px] uppercase tracking-wide">Owner</span>
+  {% elif m.pk == request.membership.pk %}
+    <span class="rounded-full border border-line px-2 py-1 text-[11px] uppercase tracking-wide">{{ m.get_role_display }}</span>
   {% else %}
     <form hx-post="{% url 'workspaces:member_role' current_workspace.slug m.pk %}" hx-target="#member-{{ m.pk }}" hx-swap="outerHTML" hx-trigger="change">
       {% csrf_token %}

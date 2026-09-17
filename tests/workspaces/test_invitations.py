@@ -28,7 +28,7 @@ def test_invite_creates_hashed_invitation_and_sends_email(admin_membership):
 
 
 def test_member_cannot_invite_and_nobody_invites_owners(member_membership, admin_membership):
-    with pytest.raises(services.PermissionDenied):
+    with pytest.raises(services.RoleRequired):
         services.invite(member_membership, "x@example.com", Role.MEMBER)
     with pytest.raises(services.InvalidOperation):
         services.invite(admin_membership, "x@example.com", Role.OWNER)
@@ -91,10 +91,12 @@ def test_accept_rejects_expired_or_revoked(admin_membership, outsider):
     Invitation.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
     with pytest.raises(services.InvalidInvitation):
         services.accept_invitation(outsider, raw)
-    raw2 = services.invite(admin_membership, "other@example.com", Role.MEMBER)
+
+    other_user = User.objects.create_user(email="other@example.com")
+    raw2 = services.invite(admin_membership, other_user.email, Role.MEMBER)
     services.revoke_invitation(admin_membership, Invitation.objects.get(email="other@example.com"))
     with pytest.raises(services.InvalidInvitation):
-        services.accept_invitation(outsider, raw2)
+        services.accept_invitation(other_user, raw2)
 
 
 def test_accept_page_flow(client, admin_membership, outsider):

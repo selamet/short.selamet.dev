@@ -194,6 +194,54 @@ def test_confirm_dialog_post_still_revokes_invitation(client, admin_membership):
     assert invitation.is_pending is False
 
 
+def test_member_role_rejects_self_change(client, admin_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_role", "acme-social", admin_membership.pk), {"role": "member"}
+    )
+    assert response.status_code == 400
+    admin_membership.refresh_from_db()
+    assert admin_membership.role == Role.ADMIN
+
+
+def test_member_remove_rejects_self_removal(client, admin_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(url("member_remove", "acme-social", admin_membership.pk))
+    assert response.status_code == 400
+    assert Membership.objects.filter(pk=admin_membership.pk).exists()
+
+
+def test_admin_cannot_promote_anyone_to_owner_through_member_role_view(
+    client, admin_membership, member_membership
+):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_role", "acme-social", member_membership.pk), {"role": "owner"}
+    )
+    assert response.status_code == 400
+    member_membership.refresh_from_db()
+    assert member_membership.role == Role.MEMBER
+
+
+def test_member_row_hides_controls_for_the_viewers_own_row(
+    client, admin_membership, member_membership
+):
+    client.force_login(admin_membership.user)
+    body = client.get(url("settings_members")).content.decode()
+    own_row_start = body.index(f'id="member-{admin_membership.pk}"')
+    own_row_end = body.index("</li>", own_row_start)
+    own_row = body[own_row_start:own_row_end]
+    assert "Remove" not in own_row
+    assert "<select" not in own_row
+    assert "Admin" in own_row
+
+    other_row_start = body.index(f'id="member-{member_membership.pk}"')
+    other_row_end = body.index("</li>", other_row_start)
+    other_row = body[other_row_start:other_row_end]
+    assert "Remove" in other_row
+    assert "<select" in other_row
+
+
 def test_change_role_and_remove(client, admin_membership, member_membership):
     client.force_login(admin_membership.user)
     response = client.post(
@@ -312,6 +360,16 @@ def test_member_remove_rejects_cross_workspace_target(client, admin_membership, 
     response = client.post(url("member_remove", "acme-social", other_membership.pk))
     assert response.status_code == 404
     assert Membership.objects.filter(pk=other_membership.pk).exists()
+
+
+def test_transfer_rejects_cross_workspace_target(client, owner_membership, other_membership):
+    client.force_login(owner_membership.user)
+    response = client.post(url("transfer"), {"membership": other_membership.pk})
+    assert response.status_code == 404
+    other_membership.refresh_from_db()
+    assert other_membership.role == Role.MEMBER
+    owner_membership.refresh_from_db()
+    assert owner_membership.role == Role.OWNER
 
 
 def test_invitation_revoke_rejects_cross_workspace_invitation(
