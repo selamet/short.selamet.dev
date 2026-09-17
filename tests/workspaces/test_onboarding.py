@@ -46,6 +46,23 @@ def test_create_workspace_flow(client, user):
     assert Membership.objects.get(workspace=workspace, user=user).role == Role.OWNER
 
 
+def test_create_workspace_view_renders_slug_race_as_form_error(client, user, monkeypatch):
+    from django.db import IntegrityError
+
+    def raise_integrity_error(*args, **kwargs):
+        raise IntegrityError
+
+    monkeypatch.setattr(Workspace.objects, "create", raise_integrity_error)
+    client.force_login(user)
+    response = client.post(
+        reverse("workspaces:create"),
+        {"name": "Acme Social", "slug": "brand-new", "timezone": "UTC"},
+    )
+    assert response.status_code == 200
+    assert "already taken" in response.content.decode()
+    assert not Workspace.objects.exists()
+
+
 def test_create_workspace_shows_slug_errors(client, user, workspace):
     client.force_login(user)
     response = client.post(

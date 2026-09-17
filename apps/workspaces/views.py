@@ -32,13 +32,17 @@ def index(request):
 def create(request):
     form = WorkspaceForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        workspace = services.create_workspace(
-            request.user,
-            name=form.cleaned_data["name"],
-            slug=form.cleaned_data["slug"],
-            timezone=form.cleaned_data["timezone"],
-        )
-        return redirect("workspaces:dashboard", slug=workspace.slug)
+        try:
+            workspace = services.create_workspace(
+                request.user,
+                name=form.cleaned_data["name"],
+                slug=form.cleaned_data["slug"],
+                timezone=form.cleaned_data["timezone"],
+            )
+        except ValidationError as error:
+            form.add_error("slug", error.messages[0])
+        else:
+            return redirect("workspaces:dashboard", slug=workspace.slug)
     return render(request, "workspaces/create.html", {"form": form})
 
 
@@ -77,7 +81,17 @@ def invitation_accept(request, token):
             request, "workspaces/invitation_mismatch.html", {"invitation": invitation}, status=403
         )
     if request.method == "POST":
-        membership = services.accept_invitation(request.user, token)
+        try:
+            membership = services.accept_invitation(request.user, token)
+        except services.InvalidInvitation:
+            return render(request, "workspaces/invitation_invalid.html", status=410)
+        except services.InvitationEmailMismatch:
+            return render(
+                request,
+                "workspaces/invitation_mismatch.html",
+                {"invitation": invitation},
+                status=403,
+            )
         messages.success(request, f"You joined {membership.workspace.name}.")
         return redirect("workspaces:dashboard", slug=membership.workspace.slug)
     return render(
@@ -96,7 +110,14 @@ def invitation_decline(request, token):
         return render(
             request, "workspaces/invitation_mismatch.html", {"invitation": invitation}, status=403
         )
-    services.decline_invitation(request.user, token)
+    try:
+        services.decline_invitation(request.user, token)
+    except services.InvalidInvitation:
+        return render(request, "workspaces/invitation_invalid.html", status=410)
+    except services.InvitationEmailMismatch:
+        return render(
+            request, "workspaces/invitation_mismatch.html", {"invitation": invitation}, status=403
+        )
     return redirect("workspaces:index")
 
 
@@ -107,9 +128,13 @@ def settings_general(request, slug):
     initial = {"name": workspace.name, "slug": workspace.slug, "timezone": workspace.timezone}
     form = WorkspaceForm(request.POST or None, initial=initial, instance=workspace)
     if request.method == "POST" and form.is_valid():
-        services.update_workspace(request.membership, **form.cleaned_data)
-        messages.success(request, "Saved.")
-        return redirect("workspaces:settings_general", slug=workspace.slug)
+        try:
+            services.update_workspace(request.membership, **form.cleaned_data)
+        except ValidationError as error:
+            form.add_error("slug", error.messages[0])
+        else:
+            messages.success(request, "Saved.")
+            return redirect("workspaces:settings_general", slug=workspace.slug)
     return render(request, "workspaces/settings/general.html", {"form": form, "section": "general"})
 
 
@@ -215,7 +240,22 @@ def transfer(request, slug):
     target = get_object_or_404(
         Membership, pk=form.cleaned_data["membership"], workspace=request.workspace
     )
-    services.transfer_ownership(request.membership, target)
+    try:
+        services.transfer_ownership(request.membership, target)
+    except services.InvalidOperation as error:
+        candidates = request.workspace.memberships.exclude(pk=request.membership.pk).select_related(
+            "user"
+        )
+        return render(
+            request,
+            "workspaces/settings/danger.html",
+            {
+                "section": "danger",
+                "candidates": candidates,
+                "form": DeleteForm(),
+                "transfer_error": str(error),
+            },
+        )
     messages.success(request, f"{target.user.email} is now the owner.")
     return redirect("workspaces:settings_general", slug=slug)
 

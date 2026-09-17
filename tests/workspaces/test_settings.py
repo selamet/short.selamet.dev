@@ -1,4 +1,5 @@
 import pytest
+from django.db import IntegrityError
 from django.urls import reverse
 
 from apps.accounts.models import User
@@ -28,6 +29,31 @@ def test_general_settings_update(client, owner_membership):
 def test_member_gets_403_on_settings(client, member_membership):
     client.force_login(member_membership.user)
     assert client.get(url("settings_general")).status_code == 403
+
+
+def test_settings_general_view_renders_slug_race_as_form_error(
+    client, owner_membership, monkeypatch
+):
+    def raise_integrity_error(self, *args, **kwargs):
+        raise IntegrityError
+
+    monkeypatch.setattr(Workspace, "save", raise_integrity_error)
+    client.force_login(owner_membership.user)
+    response = client.post(
+        url("settings_general"),
+        {"name": "Acme Studio", "slug": "acme-studio", "timezone": "UTC"},
+    )
+    assert response.status_code == 200
+    assert "already taken" in response.content.decode()
+
+
+def test_transfer_to_self_renders_error_instead_of_500(client, owner_membership):
+    client.force_login(owner_membership.user)
+    response = client.post(url("transfer"), {"membership": owner_membership.pk})
+    assert response.status_code == 200
+    assert "Choose another member" in response.content.decode()
+    owner_membership.refresh_from_db()
+    assert owner_membership.role == Role.OWNER
 
 
 def test_members_page_lists_members_and_matrix(client, owner_membership, member_membership):

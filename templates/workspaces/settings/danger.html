@@ -10,6 +10,7 @@
     <button type="submit" class="rounded-md border border-line px-4 py-2 font-medium hover:bg-surface-2">Transfer</button>
   </form>
   {% else %}<p class="mt-4 text-ink-muted">Invite someone first.</p>{% endif %}
+  {% if transfer_error %}<p class="mt-2 text-danger" role="alert">{{ transfer_error }}</p>{% endif %}
 </section>
 <section class="mt-6 rounded-lg border border-danger bg-surface p-6">
   <h2 class="text-[15px] font-semibold text-danger">Delete workspace</h2>

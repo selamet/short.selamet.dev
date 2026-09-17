@@ -178,6 +178,35 @@ def test_invitation_decline_page_rejects_mismatched_email(client, admin_membersh
     assert Invitation.objects.get().is_pending is True
 
 
+def test_concurrent_accept_returns_410_instead_of_500(
+    client, admin_membership, outsider, monkeypatch
+):
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    client.force_login(outsider)
+
+    def raise_invalid(*args, **kwargs):
+        raise services.InvalidInvitation
+
+    monkeypatch.setattr(services, "accept_invitation", raise_invalid)
+    response = client.post(reverse("workspaces:invitation_accept", args=[raw]))
+    assert response.status_code == 410
+    assert not Membership.objects.filter(user=outsider).exists()
+
+
+def test_concurrent_decline_returns_410_instead_of_500(
+    client, admin_membership, outsider, monkeypatch
+):
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    client.force_login(outsider)
+
+    def raise_invalid(*args, **kwargs):
+        raise services.InvalidInvitation
+
+    monkeypatch.setattr(services, "decline_invitation", raise_invalid)
+    response = client.post(reverse("workspaces:invitation_decline", args=[raw]))
+    assert response.status_code == 410
+
+
 def test_invitation_accept_allows_case_insensitive_email_match(client, admin_membership):
     user = User.objects.create_user(email="Fresh@Example.com")
     raw = services.invite(admin_membership, "fresh@example.com", Role.MEMBER)
