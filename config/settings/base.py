@@ -26,6 +26,7 @@ SITE_URL = env("SITE_URL", default=f"http://{SHORT_DOMAIN}")
 TRUSTED_PROXY_HOPS = env.int("TRUSTED_PROXY_HOPS", default=1)
 MAGIC_LINK_TTL_MINUTES = 15
 MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 45
+INVITATION_TTL_DAYS = 7
 # Magic link request rate limits, enforced in apps.accounts.services.request_magic_link.
 MAGIC_LINK_RATE_PER_EMAIL = env.int("MAGIC_LINK_RATE_PER_EMAIL", default=3)
 MAGIC_LINK_RATE_PER_EMAIL_WINDOW = env.int("MAGIC_LINK_RATE_PER_EMAIL_WINDOW", default=600)
