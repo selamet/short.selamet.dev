@@ -19,6 +19,19 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 SHORT_DOMAIN = env("SHORT_DOMAIN", default="localhost:8000")
 SITE_NAME = "short"
 
+# Absolute origin used in emails and other links generated outside a request.
+SITE_URL = env("SITE_URL", default=f"http://{SHORT_DOMAIN}")
+# Number of reverse proxies in front of the app that append to X-Forwarded-For;
+# 0 = trust REMOTE_ADDR only.
+TRUSTED_PROXY_HOPS = env.int("TRUSTED_PROXY_HOPS", default=1)
+MAGIC_LINK_TTL_MINUTES = 15
+MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 45
+# Magic link request rate limits, enforced in apps.accounts.services.request_magic_link.
+MAGIC_LINK_RATE_PER_EMAIL = env.int("MAGIC_LINK_RATE_PER_EMAIL", default=3)
+MAGIC_LINK_RATE_PER_EMAIL_WINDOW = env.int("MAGIC_LINK_RATE_PER_EMAIL_WINDOW", default=600)
+MAGIC_LINK_RATE_PER_IP = env.int("MAGIC_LINK_RATE_PER_IP", default=20)
+MAGIC_LINK_RATE_PER_IP_WINDOW = env.int("MAGIC_LINK_RATE_PER_IP_WINDOW", default=3600)
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",

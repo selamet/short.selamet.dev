@@ -1,0 +1,13 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Signing you in · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h1 class="text-[20px] font-semibold leading-tight">Signing you in…</h1>
+<p class="mt-2 text-ink-muted">Verifying the link and creating your session.</p>
+<form id="verify-form" method="post" action="{% url 'accounts:verify' token %}" class="mt-6">
+  {% csrf_token %}
+  <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Continue</button>
+</form>
+{% endblock %}
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">document.getElementById("verify-form").submit();</script>
+{% endblock %}

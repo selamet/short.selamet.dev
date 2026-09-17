@@ -5,6 +5,8 @@ from .base import ALLOWED_HOSTS, MAILERS, env
 
 DEBUG = False
 
+SITE_URL = env("SITE_URL", default=f"https://{SHORT_DOMAIN}")
+
 # The container HEALTHCHECK and host-side probes talk to the app over loopback, so the
 # loopback names must pass host validation next to the public domain(s).
 LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]

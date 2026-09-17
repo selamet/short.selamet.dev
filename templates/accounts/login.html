@@ -1,0 +1,22 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Sign in · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h1 class="text-[20px] font-semibold leading-tight">Sign in to {{ SITE_NAME }}</h1>
+<p class="mt-2 text-ink-muted">No password. We email you a link that signs you in.</p>
+<form method="post" action="{% url 'accounts:login' %}" class="mt-6 flex flex-col gap-4" novalidate>
+  {% csrf_token %}
+  {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+  {% if form.non_field_errors %}
+  <div class="rounded-md border border-danger px-3 py-2 text-danger" role="alert">{{ form.non_field_errors.0 }}</div>
+  {% endif %}
+  <label class="flex flex-col gap-1">
+    <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Email</span>
+    <input type="email" name="email" value="{{ form.email.value|default:'' }}" autocomplete="email" autofocus placeholder="you@agency.co" required
+           class="rounded-sm border border-line bg-surface-2 px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
+           {% if form.email.errors %}aria-invalid="true" aria-describedby="email-error"{% endif %}>
+    {% if form.email.errors %}<span id="email-error" class="text-danger" role="alert">{{ form.email.errors.0 }}</span>{% endif %}
+  </label>
+  <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Email me a link</button>
+</form>
+<p class="mt-6 text-[11.5px] text-ink-muted">By continuing you agree to the terms. Self-hosted instances set their own.</p>
+{% endblock %}

@@ -136,7 +136,7 @@ Error handling: tasks are idempotent (ClickEvent duplicate check on `link_id + o
 ### Magic link flow
 - `POST /auth/login` accepts an email. Unknown emails create a user; sign-up and sign-in are the same form. Always respond with "Check your inbox" (no account enumeration).
 - Token: 32 random bytes, sent plain in the email, stored as SHA-256 hash, valid 15 min, single use. Rate limit: 3 per email per 10 min, 20 per IP per hour (Redis).
-- `GET /auth/verify/<token>` consumes the token, opens a session, redirects to workspace creation on first login or to invitation acceptance when arriving from an invite.
+- `GET /auth/verify/<token>` renders an auto-submitting confirmation page without consuming the token (keeps email link scanners from burning it); `POST /auth/verify/<token>` consumes the token, opens a session, redirects to workspace creation on first login or to invitation acceptance when arriving from an invite.
 - Session auth for the dashboard and HTMX; standard Django CSRF.
 
 ### Authorization
@@ -172,9 +172,10 @@ Total custom JS: roughly 100 lines. No bundler.
 
 - Destination validation in the service layer: only `http`/`https`; reject the short domain itself, private IP ranges and `localhost`; OG fetch re-checks the resolved IP and follows at most 3 redirects. Domain blocklist from env and admin.
 - Optional Google Safe Browsing check via task when `SAFE_BROWSING_API_KEY` is set.
-- Rate limits (Redis sliding window): magic link 3/email/10 min and 20/IP/hour; link creation 30/user/min and 120/key/min; redirect 20/IP/s; slug availability 60/user/min.
+- Rate limits (Redis fixed window, cache `add` + `incr`): magic link 3/email/10 min and 20/IP/hour; link creation 30/user/min and 120/key/min; redirect 20/IP/s; slug availability 60/user/min.
 - Short codes: 7-char base62 generated with `secrets`; unknown codes are negatively cached.
-- Privacy: IPs are never stored raw, only hashed with a daily salt that is deleted after 24 h. User agents truncated to 256 chars. Referrer query strings dropped. Raw click events purged after retention. Deleting a user keeps workspace links with `created_by = NULL`.
+- Privacy: IPs are never stored raw, only hashed with a daily salt kept until the end of the day plus a one-hour grace. User agents truncated to 256 chars. Referrer query strings dropped. Raw click events purged after retention. Deleting a user keeps workspace links with `created_by = NULL`.
+- `client_ip` trusts only the `TRUSTED_PROXY_HOPS` entries closest to the app in `X-Forwarded-For`, so a client-supplied prefix can't be used to spoof the address rate limits key on.
 - Production settings: HSTS, secure cookies, `SECURE_PROXY_SSL_HEADER` behind Caddy, CSP with nonces for inline scripts.
 - API keys and magic link tokens stored hashed only; keys shown once at creation.
 - Sentry optional via `SENTRY_DSN`. Admin at an env-configured path, staff only. Dependencies pinned with `uv.lock`; Dependabot enabled.

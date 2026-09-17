@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Your sign-in link to {{ site_name }}</title></head>
+<body style="margin:0;padding:24px;background:#e9e6e0;font-family:'IBM Plex Sans',Helvetica,Arial,sans-serif;color:#1b1a18;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid rgba(0,0,0,0.14);border-radius:8px;">
+        <tr><td style="padding:28px 32px 8px 32px;font-size:20px;font-weight:600;"><span style="color:#d8552a;">&raquo;</span> {{ site_name }}</td></tr>
+        <tr><td style="padding:8px 32px 0 32px;font-size:20px;font-weight:600;line-height:1.2;">Your sign-in link</td></tr>
+        <tr><td style="padding:12px 32px 0 32px;font-size:14px;line-height:1.5;">Tap the button below to sign in to {{ site_name }}. The link works once and expires in {{ ttl_minutes }} minutes.</td></tr>
+        <tr><td style="padding:24px 32px 0 32px;">
+          <a href="{{ url }}" style="display:inline-block;padding:12px 20px;background:#d8552a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;border-radius:6px;">Sign in to {{ site_name }}</a>
+        </td></tr>
+        <tr><td style="padding:24px 32px 0 32px;font-size:12px;line-height:1.5;color:#77736c;">Or paste this into your browser:<br><span style="font-family:'IBM Plex Mono',Menlo,monospace;word-break:break-all;color:#1b1a18;">{{ url }}</span></td></tr>
+        <tr><td style="padding:24px 32px 28px 32px;font-size:12px;line-height:1.5;color:#77736c;">Didn&rsquo;t request this? Ignore the email. Nothing happens without the link being opened.</td></tr>
+      </table>
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;">
+        <tr><td style="padding:16px 8px;font-size:11px;color:#77736c;">sent by your self-hosted {{ site_name }} instance &middot; {{ short_domain }}</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
