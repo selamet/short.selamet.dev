@@ -13,7 +13,7 @@ from django.utils import timezone
 
 from apps.core import ratelimit
 
-from .models import Invitation, Membership, Role, Workspace
+from .models import Invitation, Membership, Role, Workspace, validate_timezone
 from .permissions import can
 
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$")
@@ -69,6 +69,7 @@ def slug_is_available(slug):
 @transaction.atomic
 def create_workspace(user, name, slug, timezone="UTC"):
     slug = validate_slug(slug)
+    validate_timezone(timezone)
     if not slug_is_available(slug):
         raise ValidationError("This slug is already taken.")
     try:
@@ -86,6 +87,7 @@ def update_workspace(actor, name, slug, timezone):
     _require(actor, "workspace.settings")
     workspace = actor.workspace
     slug = validate_slug(slug)
+    validate_timezone(timezone)
     if slug != workspace.slug and not slug_is_available(slug):
         raise ValidationError("This slug is already taken.")
     workspace.name, workspace.slug, workspace.timezone = name.strip(), slug, timezone

@@ -1,4 +1,7 @@
+import zoneinfo
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models.functions import Lower
 
@@ -9,10 +12,15 @@ class Role(models.TextChoices):
     MEMBER = "member", "Member"
 
 
+def validate_timezone(value):
+    if value not in zoneinfo.available_timezones():
+        raise ValidationError(f"{value} is not a valid timezone.")
+
+
 class Workspace(models.Model):
     name = models.CharField(max_length=80)
     slug = models.SlugField(max_length=40, unique=True)
-    timezone = models.CharField(max_length=64, default="UTC")
+    timezone = models.CharField(max_length=64, default="UTC", validators=[validate_timezone])
     default_utm_preset = models.CharField(max_length=40, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+"

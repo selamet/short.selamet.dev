@@ -14,6 +14,27 @@ def test_create_workspace_makes_creator_owner(owner):
     assert membership.user == owner and membership.role == Role.OWNER
 
 
+def test_workspace_timezone_validator_rejects_bad_value(db):
+    workspace = Workspace(name="Acme Social", slug="acme-social", timezone="Mars/Olympus")
+    with pytest.raises(ValidationError):
+        workspace.full_clean()
+
+
+def test_create_workspace_rejects_invalid_timezone(owner):
+    with pytest.raises(ValidationError):
+        services.create_workspace(owner, name="Acme", slug="acme-x", timezone="Mars/Olympus")
+    assert not Workspace.objects.exists()
+
+
+def test_update_workspace_rejects_invalid_timezone(owner_membership):
+    with pytest.raises(ValidationError):
+        services.update_workspace(
+            owner_membership, name="Acme Social", slug="acme-social", timezone="Mars/Olympus"
+        )
+    owner_membership.workspace.refresh_from_db()
+    assert owner_membership.workspace.timezone == "UTC"
+
+
 @pytest.mark.parametrize(
     "slug", ["a", "-acme", "acme-", "Acme Social", "new", "check-slug", "x" * 41, "acme_social"]
 )
