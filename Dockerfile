@@ -5,7 +5,7 @@ FROM debian:bookworm-slim AS assets
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY scripts/tailwind.sh scripts/tailwind.sh
-COPY static static
+COPY assets assets
 COPY templates templates
 COPY apps apps
 RUN bash scripts/tailwind.sh
@@ -27,7 +27,7 @@ WORKDIR /app
 COPY --from=deps /opt/venv /opt/venv
 COPY --chown=app:app . .
 COPY --from=assets --chown=app:app /app/static/css/app.css static/css/app.css
-RUN SECRET_KEY=build DATABASE_URL=sqlite:///build.db python manage.py collectstatic --noinput --ignore=src \
+RUN SECRET_KEY=build DATABASE_URL=sqlite:///build.db python manage.py collectstatic --noinput \
     && rm -f build.db && chmod +x docker/entrypoint.sh && mkdir -p /data/media && chown -R app:app /data
 USER app
 EXPOSE 8000

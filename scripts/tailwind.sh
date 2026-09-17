@@ -26,4 +26,4 @@ if [ ! -x "$BIN" ] || [ "$(cat "$BIN_DIR/.version" 2>/dev/null)" != "$TAILWIND_V
 fi
 
 mkdir -p "$ROOT/static/css"
-exec "$BIN" -i "$ROOT/static/src/app.css" -o "$ROOT/static/css/app.css" --minify "$@"
+exec "$BIN" -i "$ROOT/assets/css/app.css" -o "$ROOT/static/css/app.css" --minify "$@"

@@ -8,7 +8,7 @@ Thanks for helping build **short**.
     cp .env.example .env
     uv sync
     scripts/vendor.sh                           # htmx + chart.js (already committed, re-run to upgrade)
-    scripts/tailwind.sh --watch &               # CSS
+    scripts/tailwind.sh --watch &               # CSS: reads assets/css/app.css, writes static/css/app.css
     uv run python manage.py migrate
     uv run python manage.py runserver
 
