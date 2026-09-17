@@ -135,6 +135,19 @@ def test_resend_without_htmx_redirects_to_inbox(client):
 
 
 @pytest.mark.django_db
+def test_resend_without_htmx_reports_rate_limit(client, settings):
+    settings.MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 0
+    client.post(LOGIN, {"email": "ada@example.com"})
+    client.post(RESEND)
+    client.post(RESEND)
+    assert len(mail.outbox) == 3
+    blocked = client.post(RESEND, follow=True)
+    assert blocked.redirect_chain == [(INBOX, 302)]
+    assert "Too many sign-in links" in blocked.content.decode()
+    assert len(mail.outbox) == 3
+
+
+@pytest.mark.django_db
 def test_resend_reports_rate_limit_instead_of_failing_silently(client, settings):
     settings.MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 0
     client.post(LOGIN, {"email": "ada@example.com"})

@@ -1,11 +1,13 @@
 import time
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core import ratelimit
@@ -66,6 +68,7 @@ def _safe_next(request, candidate):
     return ""
 
 
+@never_cache
 @require_http_methods(["GET", "POST"])
 def login(request):
     if request.user.is_authenticated:
@@ -86,6 +89,7 @@ def login(request):
     return render(request, "accounts/login.html", {"form": form, "next": next_url})
 
 
+@never_cache
 @require_GET
 def check_inbox(request):
     email = request.session.get(PENDING_EMAIL_SESSION_KEY)
@@ -105,9 +109,12 @@ def resend(request):
     context = _inbox_context(email, rate_limited=rate_limited)
     if request.headers.get("HX-Request"):
         return render(request, "accounts/partials/resend.html", context)
+    if rate_limited:
+        messages.error(request, RATE_LIMIT_MESSAGE)
     return redirect("accounts:check_inbox")
 
 
+@never_cache
 @require_http_methods(["GET", "POST"])
 def verify(request, token):
     if request.method == "GET":

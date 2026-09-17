@@ -27,6 +27,12 @@ def test_verify_get_renders_auto_submit_page_without_consuming(client, user):
     assert user.magic_links.get().used_at is None
 
 
+def test_verify_response_is_never_cached(client, user):
+    raw = services.create_magic_link(user)
+    response = client.get(verify_url(raw))
+    assert "no-store" in response.headers["Cache-Control"]
+
+
 def test_verify_post_logs_in_and_redirects(client, user):
     raw = services.create_magic_link(user)
     response = client.post(verify_url(raw))
