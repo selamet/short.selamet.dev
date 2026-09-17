@@ -14,7 +14,7 @@ services:
   worker:
     image: short:latest
     env_file: .env
-    command: ["python", "manage.py", "db_worker", "--reload"]
+    command: ["python", "manage.py", "db_worker"]
     volumes:
       - media:/data/media
     depends_on:
