@@ -1,7 +1,8 @@
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import services
 from .forms import WorkspaceForm
@@ -59,3 +60,29 @@ def check_slug(request):
 @require_GET
 def dashboard(request, slug):
     return render(request, "workspaces/dashboard.html")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def invitation_accept(request, token):
+    try:
+        invitation = services.get_pending_invitation(token)
+    except services.InvalidInvitation:
+        return render(request, "workspaces/invitation_invalid.html", status=410)
+    if request.method == "POST":
+        membership = services.accept_invitation(request.user, token)
+        messages.success(request, f"You joined {membership.workspace.name}.")
+        return redirect("workspaces:dashboard", slug=membership.workspace.slug)
+    return render(
+        request, "workspaces/invitation_accept.html", {"invitation": invitation, "token": token}
+    )
+
+
+@login_required
+@require_POST
+def invitation_decline(request, token):
+    try:
+        services.decline_invitation(token)
+    except services.InvalidInvitation:
+        return render(request, "workspaces/invitation_invalid.html", status=410)
+    return redirect("workspaces:index")

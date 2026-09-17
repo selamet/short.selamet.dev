@@ -4,6 +4,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 
 from . import services
+from .models import Role
 
 TIMEZONE_CHOICES = [
     (tz, tz) for tz in sorted(zoneinfo.available_timezones()) if "/" in tz or tz == "UTC"
@@ -25,3 +26,10 @@ class WorkspaceForm(forms.Form):
         if slug != current and not services.slug_is_available(slug):
             raise ValidationError("This slug is already taken.")
         return slug
+
+
+class InviteForm(forms.Form):
+    email = forms.EmailField(max_length=254)
+    role = forms.ChoiceField(
+        choices=[(Role.MEMBER, "Member"), (Role.ADMIN, "Admin")], initial=Role.MEMBER
+    )

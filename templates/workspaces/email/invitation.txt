@@ -1,0 +1,9 @@
+{{ inviter }} invited you to {{ workspace.name }} on {{ site_name }}
+
+You'll join as {{ role }}. Open this link to accept (it expires in {{ ttl_days }} days):
+
+{{ url }}
+
+Didn't expect this? Ignore this email and nothing happens.
+
+Sent by your self-hosted {{ site_name }} instance · {{ short_domain }}

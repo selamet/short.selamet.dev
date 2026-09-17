@@ -1,5 +1,6 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 
 from apps.workspaces import services
 from apps.workspaces.models import Membership, Role, Workspace
@@ -29,6 +30,15 @@ def test_slug_is_available_is_case_insensitive(workspace):
 def test_create_workspace_rejects_taken_slug(workspace, outsider):
     with pytest.raises(ValidationError):
         services.create_workspace(outsider, name="Other", slug="acme-social")
+
+
+def test_create_workspace_surfaces_race_on_duplicate_slug(outsider, monkeypatch):
+    def raise_integrity_error(*args, **kwargs):
+        raise IntegrityError
+
+    monkeypatch.setattr(Workspace.objects, "create", raise_integrity_error)
+    with pytest.raises(ValidationError):
+        services.create_workspace(outsider, name="Other", slug="new-slug")
 
 
 def test_one_owner_per_workspace(workspace, admin_membership):
