@@ -12,3 +12,9 @@ staticfiles
 media
 docs
 node_modules
+.superpowers
+tests
+.github
+.pre-commit-config.yaml
+compose.yaml
+compose.dev.yaml
