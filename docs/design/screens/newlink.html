@@ -1,0 +1,202 @@
+<sc-if value="{{ is.newlink }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-wrap:wrap;gap:20px;max-width:1240px;align-items:flex-start">
+    <div style="flex:1 1 420px;display:flex;flex-direction:column;gap:14px;min-width:0">
+
+      <div style="background:rgba(178,32,32,.06);border:1px solid rgba(178,32,32,.4);border-radius:6px;padding:12px 14px">
+        <div style="font:600 12.5px/1.3 'IBM Plex Sans',sans-serif;color:#b22020;margin-bottom:6px">2 fields need attention</div>
+        <div style="display:flex;flex-direction:column;gap:3px;font:400 11.5px/1.5 'IBM Plex Sans',sans-serif">
+          <span>· <a href="#code">Short code</a> — “admin” is reserved</span>
+          <span>· <a href="#ios">iOS destination</a> — must be a full URL or app scheme</span>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+        <div style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Destination</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Destination URL</span>
+          <div style="border:1px solid #1b1a18;border-radius:4px;padding:9px 11px;font:400 12.5px/1.3 'IBM Plex Mono',monospace;background:#fff;outline:2px solid rgba(216,85,42,.35);outline-offset:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">https://shop.acmesocial.com/collections/spring</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.035);border:1px solid rgba(0,0,0,.1);border-radius:4px;padding:9px 11px">
+          <span style="flex:none;width:22px;height:22px;border-radius:4px;background:rgba(0,0,0,.14)"></span>
+          <span style="min-width:0;display:flex;flex-direction:column;gap:2px">
+            <span style="font:500 12px/1.3 'IBM Plex Sans',sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Spring Collection 2026 — Acme Social</span>
+            <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">fetched title + favicon</span>
+          </span>
+          <button type="button" style="margin-left:auto;background:none;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 8px;font:400 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Re-fetch</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px">
+          <div style="display:flex;flex-direction:column;gap:5px" id="code">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Short code</span>
+            <div style="display:flex;align-items:center;border:1px solid #b22020;border-radius:4px;overflow:hidden">
+              <span style="font:400 12.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);padding:9px 0 9px 11px">sho.rt<span style="color:#d8552a">»</span></span>
+              <span style="flex:1;padding:9px 11px 9px 2px;font:500 12.5px/1 'IBM Plex Mono',monospace">admin</span>
+            </div>
+            <span style="font:400 11px/1.35 'IBM Plex Sans',sans-serif;color:#b22020">Reserved word — pick another code.</span>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button type="button" style="flex:none;white-space:nowrap;background:none;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 8px;font:400 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">↻ Randomise</button>
+              <span style="font:400 11px/1 'IBM Plex Sans',sans-serif;color:#2f6f4e">✓ spring-drop is available</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Tags</span>
+            <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:6px 8px;display:flex;gap:5px;flex-wrap:wrap;align-items:center;min-height:38px">
+              <span style="font:400 11px/1 'IBM Plex Sans',sans-serif;background:rgba(0,0,0,.07);border-radius:3px;padding:4px 7px">campaign ✕</span>
+              <span style="font:400 11px/1 'IBM Plex Sans',sans-serif;background:rgba(0,0,0,.07);border-radius:3px;padding:4px 7px">ig-bio ✕</span>
+              <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.35)">add tag…</span>
+            </div>
+            <span style="font:400 11px/1.35 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Type to create a new tag inline.</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Internal note <span style="color:rgba(0,0,0,.4);font-weight:400">optional</span></span>
+          <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:9px 11px;font:400 12.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.35);min-height:52px">Only visible to your workspace…</div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;align-items:baseline;gap:9px"><span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">UTM builder</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">one click, then edit</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="border:1px solid #1b1a18;background:#1b1a18;color:#e9e6e0;border-radius:999px;padding:6px 12px;font:500 11.5px/1 'IBM Plex Sans',sans-serif">Instagram bio</span>
+          <sc-for list="{{ utmPresets }}" as="p" hint-placeholder-count="5">
+            <span style="border:1px solid rgba(0,0,0,.18);border-radius:999px;padding:6px 12px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;background:#fff;color:rgba(0,0,0,.65)">{{ p }}</span>
+          </sc-for>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
+          <sc-for list="{{ utmFields }}" as="f" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)">{{ f.name }}</span>
+              <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:7px 9px;font:400 12px/1 'IBM Plex Mono',monospace">{{ f.value }}</div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.1);border-radius:4px;padding:9px 11px">
+          <div style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45);margin-bottom:5px">FINAL URL</div>
+          <div style="font:400 11.5px/1.6 'IBM Plex Mono',monospace;word-break:break-all">shop.acmesocial.com/collections/spring<span style="color:#b8471f">?utm_source=instagram&amp;utm_medium=bio&amp;utm_campaign=spring26</span></div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="width:30px;height:17px;border-radius:999px;background:#d8552a;position:relative;display:inline-block"><span style="position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span>
+          <span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Different destinations per device</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center" id="ios">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">iOS</span>
+            <div style="border:1px solid #b22020;border-radius:4px;padding:8px 10px;font:400 12px/1.3 'IBM Plex Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">instagram://user?username=acmesocial</div>
+          </div>
+          <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:start">
+            <span></span>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              <span style="font:400 11px/1.35 'IBM Plex Sans',sans-serif;color:#b22020">App scheme needs a web fallback URL.</span>
+              <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12px/1.3 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Fallback URL if app is not installed</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Android</span>
+            <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12px/1.3 'IBM Plex Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">https://m.acmesocial.com/spring</div>
+          </div>
+          <div style="display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;align-items:center">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Desktop</span>
+            <div style="border:1px solid rgba(0,0,0,.12);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Mono',monospace;background:rgba(0,0,0,.035);color:rgba(0,0,0,.5)">default destination</div>
+          </div>
+        </div>
+        <div style="border:1px dashed rgba(0,0,0,.2);border-radius:4px;padding:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font:400 11px/1.4 'IBM Plex Mono',monospace;color:rgba(0,0,0,.6)">
+          <span style="font:500 11.5px/1 'IBM Plex Mono',monospace">sho.rt»spring-drop</span>
+          <span style="color:#d8552a">»</span>
+          <span style="display:flex;flex-direction:column;gap:5px">
+            <span>iOS &nbsp;&nbsp;&nbsp;→ instagram:// &nbsp;<span style="color:rgba(0,0,0,.4)">→ fallback m.acmesocial.com</span></span>
+            <span>Android → m.acmesocial.com/spring</span>
+            <span>Desktop → shop.acmesocial.com/collections/spring</span>
+          </span>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;align-items:baseline;gap:9px"><span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Social card</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">OG defaults fetched from destination</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Title <span style="font-weight:400;color:#b8471f">overridden</span></span>
+              <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Sans',sans-serif">Spring drop is live 🌱</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Description</span>
+              <div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12px/1.5 'IBM Plex Sans',sans-serif;min-height:48px;color:rgba(0,0,0,.65)">40 new pieces. Free shipping this week only.</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px">
+              <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Image</span>
+              <div style="border:1px dashed rgba(0,0,0,.25);border-radius:4px;padding:12px;text-align:center;font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Drop an image, or <a href="#">paste a URL</a><br><span style="font:400 10.5px/1 'IBM Plex Mono',monospace">1200×630 recommended</span></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <div style="display:flex;gap:5px;flex-wrap:wrap">
+              <span style="border:1px solid #1b1a18;background:#1b1a18;color:#e9e6e0;border-radius:4px;padding:4px 9px;font:500 11px/1 'IBM Plex Sans',sans-serif">WhatsApp</span>
+              <span style="border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:4px 9px;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">X</span>
+              <span style="border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:4px 9px;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">LinkedIn</span>
+              <span style="border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:4px 9px;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">Slack</span>
+            </div>
+            <div style="background:rgba(0,0,0,.04);border-radius:6px;padding:12px">
+              <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:8px;overflow:hidden;max-width:290px">
+                <div style="height:110px;background:repeating-linear-gradient(135deg,rgba(0,0,0,.05) 0 8px,rgba(0,0,0,.09) 8px 16px);display:flex;align-items:center;justify-content:center;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">og:image 1200×630</div>
+                <div style="padding:9px 11px;display:flex;flex-direction:column;gap:3px">
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">SHO.RT</span>
+                  <span style="font:600 12.5px/1.35 'IBM Plex Sans',sans-serif">Spring drop is live 🌱</span>
+                  <span style="font:400 11.5px/1.45 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">40 new pieces. Free shipping this week only.</span>
+                </div>
+              </div>
+            </div>
+            <span style="font:400 11px/1.4 'Architects Daughter',cursive;color:rgba(0,0,0,.5)">preview re-renders per platform — same data, each one’s crop and line clamp</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 18px;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;align-items:center;gap:8px;font:600 13px/1 'IBM Plex Sans',sans-serif;cursor:pointer"><span style="color:rgba(0,0,0,.45)">▾</span>Advanced<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);font-weight:400">expiration ships in phase 2</span></div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;opacity:.55">
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Expire on date</span>
+            <div style="border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Mono',monospace;background:rgba(0,0,0,.04);min-width:160px">2026-12-31</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Expire after clicks</span>
+            <div style="border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Mono',monospace;background:rgba(0,0,0,.04);min-width:120px">10000</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">On expiry</span>
+            <div style="border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Sans',sans-serif;background:rgba(0,0,0,.04);min-width:160px">Show expired page ▾</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;position:sticky;bottom:0;background:#e9e6e0;padding:10px 0">
+        <button type="button" sc-camel-on-click="{{ go.dashboard }}" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:#c04a22">Save link</button>
+        <button type="button" sc-camel-on-click="{{ go.dashboard }}" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 14px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Save &amp; copy</button>
+        <button type="button" sc-camel-on-click="{{ go.dashboard }}" style="background:none;border:0;padding:8px 10px;font:400 12.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);cursor:pointer">Cancel</button>
+        <span style="margin-left:auto;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">⌘↵ saves</span>
+      </div>
+    </div>
+
+    <div style="flex:1 1 280px;max-width:340px;display:flex;flex-direction:column;gap:12px">
+      <div style="background:#1b1a18;border-radius:6px;padding:14px 16px;color:#e9e6e0;display:flex;flex-direction:column;gap:8px">
+        <span style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.12em;color:rgba(233,230,224,.5)">RESULTING LINK</span>
+        <span style="font:500 15px/1.3 'IBM Plex Mono',monospace">sho.rt<span style="color:#ef6a3d">»</span>spring-drop</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" style="background:rgba(233,230,224,.12);border:0;color:#e9e6e0;border-radius:3px;padding:5px 9px;font:500 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(233,230,224,.22)">Copy</button>
+          <button type="button" sc-camel-on-click="{{ qrOpen }}" style="background:rgba(233,230,224,.12);border:0;color:#e9e6e0;border-radius:3px;padding:5px 9px;font:500 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(233,230,224,.22)">QR</button>
+        </div>
+      </div>
+      <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">
+          Full page load (GET /links/new). Inside it:<br>
+          · URL blur → <span style="font-family:'IBM Plex Mono',monospace">hx-post /links/metadata</span> fills title, favicon, OG defaults.<br>
+          · Code field → <span style="font-family:'IBM Plex Mono',monospace">hx-get /links/check?code= trigger keyup changed delay:300ms</span>, swaps the availability line only.<br>
+          · Preset chips → <span style="font-family:'IBM Plex Mono',monospace">hx-post /utm/preset</span>, swaps the four UTM inputs + final URL.<br>
+          · Platform switcher → swaps the card preview partial.<br>
+          · Device toggle → swaps the routing rows + diagram.<br>
+          · Submit posts the whole form; server re-renders it with the error summary on failure.
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>

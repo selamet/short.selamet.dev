@@ -1,0 +1,36 @@
+<sc-if value="{{ is.account }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:760px">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:13px">
+      <span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Profile</span>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px"><span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Display name</span><div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12.5px/1 'IBM Plex Sans',sans-serif">Selamet</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Email</span><div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12.5px/1 'IBM Plex Mono',monospace">you@agency.co</div><span style="font:400 11px/1.4 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Changing it sends a confirmation link to the new address.</span></div>
+      </div>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+      <span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Theme</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span style="display:flex;flex-direction:column;gap:6px;align-items:center;border:1px solid #1b1a18;border-radius:5px;padding:9px 14px;font:500 11.5px/1 'IBM Plex Sans',sans-serif"><span style="width:52px;height:32px;border-radius:3px;background:linear-gradient(135deg,#e9e6e0 50%,#1b1a18 50%)"></span>System</span>
+        <span style="display:flex;flex-direction:column;gap:6px;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:9px 14px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)"><span style="width:52px;height:32px;border-radius:3px;background:#e9e6e0;border:1px solid rgba(0,0,0,.12)"></span>Light</span>
+        <span style="display:flex;flex-direction:column;gap:6px;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;padding:9px 14px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)"><span style="width:52px;height:32px;border-radius:3px;background:#1b1a18"></span>Dark</span>
+      </div>
+      <span style="font:400 11px/1.4 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">sets data-theme on &lt;html&gt;, persisted per user</span>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:11px">
+      <span style="font:600 13.5px/1 'IBM Plex Sans',sans-serif">Active sessions</span>
+      <sc-for list="{{ sessions }}" as="s" hint-placeholder-count="3">
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 150px 80px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.07);font:400 12px/1.35 'IBM Plex Sans',sans-serif">
+          <span style="display:flex;flex-direction:column;gap:2px"><span style="font-weight:500">{{ s.device }}</span><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">{{ s.ip }}</span></span>
+          <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">{{ s.last }}</span>
+          <button type="button" style="justify-self:end;background:none;border:0;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:#b22020;cursor:pointer">{{ s.action }}</button>
+        </div>
+      </sc-for>
+      <button type="button" style="align-self:flex-start;background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:7px 12px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Sign out everywhere else</button>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(178,32,32,.4);border-radius:6px;padding:16px 18px;display:flex;flex-direction:column;gap:9px">
+      <span style="font:600 13px/1 'IBM Plex Sans',sans-serif;color:#b22020">Delete account</span>
+      <span style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">You must transfer or delete any workspace you own first. Type <span style="font-family:'IBM Plex Mono',monospace">delete my account</span> to confirm.</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:8px 10px;font:400 12px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);min-width:180px">delete my account</div><button type="button" style="background:rgba(178,32,32,.08);border:1px solid rgba(178,32,32,.3);color:rgba(178,32,32,.5);border-radius:4px;padding:7px 12px;font:500 12px/1 'IBM Plex Sans',sans-serif">Delete account</button><span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">disabled state</span></div>
+    </div>
+  </div>
+  </sc-if>

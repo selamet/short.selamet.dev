@@ -1,0 +1,154 @@
+<sc-if value="{{ is.analytics }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <span style="font:500 16px/1.2 'IBM Plex Mono',monospace">sho.rt<span style="color:#d8552a">»</span>spring-drop</span>
+          <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px">→ shop.acmesocial.com/collections/spring · created 12 Mar 2026</span>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:6px 11px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Copy</button>
+          <button type="button" sc-camel-on-click="{{ qrOpen }}" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:6px 11px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">QR</button>
+          <button type="button" sc-camel-on-click="{{ go.newlink }}" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:6px 11px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Edit</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px solid rgba(0,0,0,.08);padding-top:11px">
+        <div style="display:flex;border:1px solid rgba(0,0,0,.18);border-radius:4px;overflow:hidden">
+          <span style="padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6);border-right:1px solid rgba(0,0,0,.12)">7d</span>
+          <span style="padding:5px 11px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;background:#1b1a18;color:#e9e6e0;border-right:1px solid rgba(0,0,0,.12)">30d</span>
+          <span style="padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6);border-right:1px solid rgba(0,0,0,.12)">90d</span>
+          <span style="padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">Custom ▾</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:7px">
+          <span style="width:30px;height:17px;border-radius:999px;background:#d8552a;position:relative;display:inline-block"><span style="position:absolute;top:2px;right:2px;width:13px;height:13px;border-radius:50%;background:#fff"></span></span>
+          <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif">Exclude bots</span>
+          <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">−412 filtered</span>
+        </div>
+        <span style="display:flex;align-items:center;gap:7px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">Granularity: <span style="font-weight:500;color:#1b1a18">daily ▾</span></span>
+        <button type="button" style="margin-left:auto;background:none;border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:6px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Export CSV</button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:13px 15px;display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:rgba(0,0,0,.45);text-transform:uppercase">{{ k.label }}</span>
+          <span style="font:600 23px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">{{ k.value }}</span>
+          <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:{{ k.color }}">{{ k.delta }} vs prev 30d</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:15px 17px">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px">
+        <span style="font:600 13px/1 'IBM Plex Sans',sans-serif">Clicks over time</span>
+        <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">Chart.js line · total vs unique</span>
+      </div>
+      <svg sc-camel-view-box="0 0 900 200" width="100%" height="200" sc-camel-preserve-aspect-ratio="none" style="display:block">
+        <line x1="0" y1="40" x2="900" y2="40" stroke="rgba(0,0,0,.08)"></line>
+        <line x1="0" y1="90" x2="900" y2="90" stroke="rgba(0,0,0,.08)"></line>
+        <line x1="0" y1="140" x2="900" y2="140" stroke="rgba(0,0,0,.08)"></line>
+        <line x1="0" y1="190" x2="900" y2="190" stroke="rgba(0,0,0,.18)"></line>
+        <polyline points="{{ series.total }}" fill="none" stroke="#d8552a" stroke-width="2"></polyline>
+        <polyline points="{{ series.unique }}" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="1.5" stroke-dasharray="4 3"></polyline>
+      </svg>
+      <div style="display:flex;justify-content:space-between;font:400 10px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);margin-top:7px">
+        <span>12 Feb</span><span>19 Feb</span><span>26 Feb</span><span>4 Mar</span><span>11 Mar</span>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:10px;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:#d8552a"></span>Total clicks</span>
+        <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:2px;background:rgba(0,0,0,.35)"></span>Unique</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px">
+      <sc-for list="{{ panels }}" as="p" hint-placeholder-count="6">
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <span style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">{{ p.title }}</span>
+            <span style="margin-left:auto;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">{{ p.kind }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <sc-for list="{{ p.rows }}" as="r" hint-placeholder-count="4">
+              <div style="display:flex;flex-direction:column;gap:3px">
+                <div style="display:flex;gap:8px;font:400 11.5px/1.3 'IBM Plex Sans',sans-serif">
+                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span>
+                  <span style="margin-left:auto;font:500 11.5px/1.3 'IBM Plex Mono',monospace;color:rgba(0,0,0,.6)">{{ r.value }}</span>
+                </div>
+                <div style="height:5px;border-radius:2px;background:rgba(0,0,0,.06)"><div style="height:5px;border-radius:2px;background:rgba(216,85,42,.75);width:{{ r.pct }}"></div></div>
+              </div>
+            </sc-for>
+          </div>
+          <a href="#" style="font:400 11px/1 'IBM Plex Sans',sans-serif">View all {{ p.more }} →</a>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px">
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:11px"><span style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">Hour of day × weekday</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">CSS grid heatmap</span></div>
+        <div style="display:grid;grid-template-columns:28px repeat(24,1fr);gap:2px">
+          <span></span>
+          <sc-for list="{{ hours }}" as="h" hint-placeholder-count="24">
+            <span style="font:400 7.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);text-align:center">{{ h }}</span>
+          </sc-for>
+          <sc-for list="{{ heatRows }}" as="row" hint-placeholder-count="7">
+            <span style="font:400 9px/12px 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">{{ row.day }}</span>
+            <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="24">
+              <span style="height:13px;border-radius:2px;background:{{ c }}"></span>
+            </sc-for>
+          </sc-for>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px;font:400 10px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">
+          low
+          <span style="width:16px;height:9px;background:rgba(216,85,42,.12)"></span>
+          <span style="width:16px;height:9px;background:rgba(216,85,42,.32)"></span>
+          <span style="width:16px;height:9px;background:rgba(216,85,42,.55)"></span>
+          <span style="width:16px;height:9px;background:rgba(216,85,42,.85)"></span>
+          high
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:9px">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">Recent clicks</span><span style="margin-left:auto;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">anonymised</span></div>
+        <sc-for list="{{ recent }}" as="c" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:56px 1fr auto;gap:9px;font:400 11.5px/1.3 'IBM Plex Sans',sans-serif;padding-bottom:6px;border-bottom:1px solid rgba(0,0,0,.06)">
+            <span style="font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">{{ c.time }}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.detail }}</span>
+            <span style="font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)">{{ c.geo }}</span>
+          </div>
+        </sc-for>
+        <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+          <div style="font:400 11.5px/1.45 'Architects Daughter',cursive;color:#8f3414;border-left:2px dashed rgba(216,85,42,.6);padding-left:8px">Polls with <span style="font-family:'IBM Plex Mono',monospace">hx-trigger="every 20s"</span>, swaps the list only.</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <span style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">Destination split <span style="font-weight:400;font-size:10.5px;font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">device-routed link</span></span>
+        <div style="display:flex;gap:14px;align-items:center">
+          <div style="width:88px;height:88px;border-radius:50%;background:conic-gradient(#d8552a 0 52%,#1b1a18 52% 81%,rgba(0,0,0,.2) 81% 100%);position:relative"><span style="position:absolute;inset:22px;background:#fff;border-radius:50%"></span></div>
+          <div style="display:flex;flex-direction:column;gap:6px;font:400 11.5px/1 'IBM Plex Sans',sans-serif">
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:#d8552a;border-radius:2px"></span>iOS · instagram:// <span style="font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)">52%</span></span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:#1b1a18;border-radius:2px"></span>Android · m.acme <span style="font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)">29%</span></span>
+            <span style="display:flex;align-items:center;gap:6px"><span style="width:9px;height:9px;background:rgba(0,0,0,.2);border-radius:2px"></span>Desktop · shop <span style="font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.5)">19%</span></span>
+            <span style="font:400 10.5px/1.4 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">app opened 71% of iOS taps</span>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px dashed rgba(0,0,0,.22);border-radius:6px;padding:22px 18px;display:flex;flex-direction:column;gap:8px;align-items:center;text-align:center">
+        <div style="font:600 24px/1 'IBM Plex Mono',monospace;color:rgba(216,85,42,.45)">»&nbsp;·&nbsp;·</div>
+        <span style="font:600 13px/1.3 'IBM Plex Sans',sans-serif">No clicks yet</span>
+        <span style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);max-width:230px">Share the link and data lands here within seconds.</span>
+        <div style="display:flex;gap:6px"><button type="button" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:6px 11px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Copy link</button><button type="button" sc-camel-on-click="{{ qrOpen }}" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:5px 11px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Get QR</button></div>
+        <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35)">zero-click empty state</span>
+      </div>
+    </div>
+
+    <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">
+        Full page load for the shell. Date range, granularity and the bot toggle all <span style="font-family:'IBM Plex Mono',monospace">hx-get /links/&lt;id&gt;/analytics?range=…</span> with <span style="font-family:'IBM Plex Mono',monospace">hx-target="#analytics-body" hx-push-url="true"</span> — one swap refreshes KPIs, chart data attrs and every panel. Charts re-init from the swapped <span style="font-family:'IBM Plex Mono',monospace">data-series</span> JSON on <span style="font-family:'IBM Plex Mono',monospace">htmx:afterSwap</span>. Export CSV is a plain link download.
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>

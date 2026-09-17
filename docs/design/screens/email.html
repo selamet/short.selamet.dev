@@ -1,0 +1,21 @@
+<sc-if value="{{ is.email }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div style="width:min(560px,100%);background:#f4f2ee;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:22px">
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.1);border-radius:6px;padding:28px 26px;display:flex;flex-direction:column;gap:16px">
+        <span style="display:flex;align-items:center;gap:7px"><span style="font:600 16px/1 'IBM Plex Mono',monospace;color:#d8552a">»</span><span style="font:600 13px/1 'IBM Plex Sans',sans-serif">short</span></span>
+        <span style="font:600 17px/1.3 'IBM Plex Sans',sans-serif">Your sign-in link</span>
+        <span style="font:400 13px/1.65 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.65)">Tap the button below to sign in to <strong>Acme Social</strong>. The link works once and expires in 15 minutes.</span>
+        <a href="#" style="align-self:flex-start;background:#d8552a;color:#fff;border-radius:4px;padding:11px 18px;font:500 13px/1 'IBM Plex Sans',sans-serif;text-decoration:none">Sign in to short</a>
+        <div style="border-top:1px solid rgba(0,0,0,.08);padding-top:14px;display:flex;flex-direction:column;gap:6px">
+          <span style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">Or paste this into your browser:</span>
+          <span style="font:400 11px/1.6 'IBM Plex Mono',monospace;color:rgba(0,0,0,.65);word-break:break-all">https://sho.rt/auth/m/7fa1c2e9b4d8a65310cf</span>
+        </div>
+        <span style="font:400 11px/1.6 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Didn’t request this? Ignore the email — nothing happens without the link being opened.</span>
+      </div>
+      <span style="display:block;text-align:center;font:400 10.5px/1.6 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);margin-top:12px">sent by your self-hosted short instance · sho.rt</span>
+    </div>
+    <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+      <div style="width:min(380px,100%);border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">Table-based HTML email, inline styles only, 560px max. Single accent button, no images so it renders with remote content blocked. Plain-text alternative carries the same URL.</div>
+    </sc-if>
+  </div>
+  </sc-if>

@@ -1,0 +1,30 @@
+<sc-if value="{{ is.preview }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div style="width:min(520px,100%);background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:8px;padding:26px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;gap:7px"><span style="font:600 15px/1 'IBM Plex Mono',monospace;color:#d8552a">»</span><span style="font:600 13px/1 'IBM Plex Sans',sans-serif">short</span><span style="margin-left:auto;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">link preview</span></div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">You’re about to visit</span>
+        <span style="font:400 13px/1.5 'IBM Plex Mono',monospace;word-break:break-all">shop.acmesocial.com/collections/spring</span>
+      </div>
+      <div style="border:1px solid rgba(0,0,0,.12);border-radius:6px;overflow:hidden">
+        <div style="height:120px;background:repeating-linear-gradient(135deg,rgba(0,0,0,.05) 0 8px,rgba(0,0,0,.09) 8px 16px);display:flex;align-items:center;justify-content:center;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">og:image</div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:3px"><span style="font:600 13px/1.35 'IBM Plex Sans',sans-serif">Spring drop is live 🌱</span><span style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">40 new pieces. Free shipping this week only.</span></div>
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">
+        <span>Short code <span style="font-family:'IBM Plex Mono',monospace;color:#1b1a18">sho.rt»spring-drop</span></span>
+        <span>Created <span style="color:#1b1a18">12 Mar 2026</span></span>
+        <span>By <span style="color:#1b1a18">Acme Social</span></span>
+      </div>
+      <div style="display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+        <button type="button" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:10px 16px;font:500 13px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:#c04a22">Continue →</button>
+        <a href="#" style="font:400 12px/1 'IBM Plex Sans',sans-serif">Report this link</a>
+      </div>
+      <span style="font:400 11px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45);border-top:1px solid rgba(0,0,0,.08);padding-top:11px">Add a <span style="font-family:'IBM Plex Mono',monospace">+</span> to any short link to see this page instead of being redirected.</span>
+    </div>
+    <div style="width:min(420px,100%);display:flex;flex-direction:column;gap:12px">
+      <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+        <div style="border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">Static page, no auth, no JS required. Continue is a plain anchor with <span style="font-family:'IBM Plex Mono',monospace">rel="noopener nofollow"</span> — the click is counted server-side on the redirect route, not here.</div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>

@@ -1,0 +1,62 @@
+<sc-if value="{{ is.overview }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:11px 14px">
+      <span style="font:600 13px/1 'IBM Plex Sans',sans-serif">Acme Social</span>
+      <span style="font:400 11.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">42 links · 3 members</span>
+      <div style="margin-left:auto;display:flex;border:1px solid rgba(0,0,0,.18);border-radius:4px;overflow:hidden">
+        <span style="padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6);border-right:1px solid rgba(0,0,0,.12)">7d</span>
+        <span style="padding:5px 11px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;background:#1b1a18;color:#e9e6e0;border-right:1px solid rgba(0,0,0,.12)">30d</span>
+        <span style="padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6)">90d</span>
+      </div>
+      <button type="button" style="background:none;border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:6px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Export CSV</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+      <sc-for list="{{ wsKpis }}" as="k" hint-placeholder-count="4">
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:13px 15px;display:flex;flex-direction:column;gap:6px">
+          <span style="font:600 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.11em;color:rgba(0,0,0,.45);text-transform:uppercase">{{ k.label }}</span>
+          <span style="font:600 23px/1 'IBM Plex Sans',sans-serif;letter-spacing:-.02em">{{ k.value }}</span>
+          <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:{{ k.color }}">{{ k.delta }} vs prev 30d</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:12px">
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:15px 17px">
+        <div style="font:600 12.5px/1 'IBM Plex Sans',sans-serif;margin-bottom:12px">Workspace clicks over time</div>
+        <svg sc-camel-view-box="0 0 700 170" width="100%" height="170" sc-camel-preserve-aspect-ratio="none" style="display:block">
+          <line x1="0" y1="42" x2="700" y2="42" stroke="rgba(0,0,0,.08)"></line>
+          <line x1="0" y1="105" x2="700" y2="105" stroke="rgba(0,0,0,.08)"></line>
+          <line x1="0" y1="164" x2="700" y2="164" stroke="rgba(0,0,0,.18)"></line>
+          <sc-for list="{{ bars }}" as="b" hint-placeholder-count="30">
+            <rect x="{{ b.x }}" y="{{ b.y }}" width="16" height="{{ b.h }}" fill="rgba(216,85,42,.8)"></rect>
+          </sc-for>
+        </svg>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:9px">
+        <div style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">Top links</div>
+        <sc-for list="{{ leaderboard }}" as="l" hint-placeholder-count="6">
+          <button type="button" sc-camel-on-click="{{ go.analytics }}" style="display:flex;gap:9px;align-items:center;background:none;border:0;border-bottom:1px solid rgba(0,0,0,.06);padding:0 0 6px;width:100%;text-align:left;cursor:pointer" style-hover="background:rgba(0,0,0,.025)">
+            <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);width:14px">{{ l.rank }}</span>
+            <span style="font:500 11.5px/1.3 'IBM Plex Mono',monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span style="color:#d8552a">»</span>{{ l.code }}</span>
+            <span style="margin-left:auto;font:500 11.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.6)">{{ l.clicks }}</span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px">
+      <sc-for list="{{ wsPanels }}" as="p" hint-placeholder-count="3">
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:9px">
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 12.5px/1 'IBM Plex Sans',sans-serif">{{ p.title }}</span><span style="margin-left:auto;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">{{ p.kind }}</span></div>
+          <sc-for list="{{ p.rows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <div style="display:flex;gap:8px;font:400 11.5px/1.3 'IBM Plex Sans',sans-serif"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.label }}</span><span style="margin-left:auto;font:500 11.5px/1.3 'IBM Plex Mono',monospace;color:rgba(0,0,0,.6)">{{ r.value }}</span></div>
+              <div style="height:5px;border-radius:2px;background:rgba(0,0,0,.06)"><div style="height:5px;border-radius:2px;background:rgba(216,85,42,.75);width:{{ r.pct }}"></div></div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>

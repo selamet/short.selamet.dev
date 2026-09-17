@@ -1,0 +1,72 @@
+<sc-if value="{{ is.mobile }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+    <div style="width:390px;flex:none;background:#e9e6e0;border:1px solid rgba(0,0,0,.2);border-radius:14px;overflow:hidden">
+      <div style="background:#fff;border-bottom:1px solid rgba(0,0,0,.1);padding:11px 14px;display:flex;align-items:center;gap:9px">
+        <span style="font:600 15px/1 'IBM Plex Mono',monospace;color:#d8552a">»</span>
+        <span style="flex:1;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:6px 9px;font:400 12px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.35)">Search links</span>
+        <span style="width:26px;height:26px;border-radius:50%;background:rgba(0,0,0,.1)"></span>
+      </div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:7px"><div style="flex:1;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:9px 10px;font:400 12px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);background:#fff">Paste URL…</div><button type="button" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:9px 12px;font:500 12px/1 'IBM Plex Sans',sans-serif;min-height:44px;cursor:pointer">Go</button></div>
+        <sc-for list="{{ mobileRows }}" as="r" hint-placeholder-count="4">
+          <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:11px 12px;display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font:500 13px/1 'IBM Plex Mono',monospace"><span style="color:#d8552a">»</span>{{ r.code }}</span><span style="margin-left:auto;display:flex;align-items:center;gap:5px;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.status }}</span></div>
+            <span style="font:400 11.5px/1.4 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.6);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.dest }}</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font:500 12px/1 'IBM Plex Mono',monospace">{{ r.clicks }}</span>
+              <svg sc-camel-view-box="0 0 64 18" width="56" height="16" sc-camel-preserve-aspect-ratio="none"><polyline points="{{ r.spark }}" fill="none" stroke="#d8552a" stroke-width="1.5"></polyline></svg>
+              <span style="margin-left:auto;display:flex;gap:6px">
+                <span style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;font:400 10.5px/1 'IBM Plex Mono',monospace">copy</span>
+                <span style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;font:400 10.5px/1 'IBM Plex Mono',monospace">QR</span>
+                <span style="min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;font:400 12px/1 'IBM Plex Mono',monospace">⋯</span>
+              </span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border-top:1px solid rgba(0,0,0,.1);padding:8px 14px;display:flex;justify-content:space-between">
+        <sc-for list="{{ tabbar }}" as="t" hint-placeholder-count="4">
+          <span style="display:flex;flex-direction:column;align-items:center;gap:4px;min-width:56px;min-height:44px;justify-content:center;font:400 10px/1 'IBM Plex Sans',sans-serif;color:{{ t.color }}"><span style="font:600 13px/1 'IBM Plex Mono',monospace">{{ t.icon }}</span>{{ t.label }}</span>
+        </sc-for>
+      </div>
+      <span style="display:block;text-align:center;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);padding:8px">links list · 390</span>
+    </div>
+
+    <div style="width:390px;flex:none;background:#e9e6e0;border:1px solid rgba(0,0,0,.2);border-radius:14px;overflow:hidden">
+      <div style="background:#fff;border-bottom:1px solid rgba(0,0,0,.1);padding:11px 14px;display:flex;align-items:center;gap:9px"><span style="font:400 13px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">✕</span><span style="font:600 13px/1 'IBM Plex Sans',sans-serif">New link</span><span style="margin-left:auto;font:500 12px/1 'IBM Plex Sans',sans-serif;color:#b8471f">Save</span></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-direction:column;gap:5px"><span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Destination</span><div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:11px 10px;font:400 12px/1 'IBM Plex Mono',monospace;background:#fff">shop.acmesocial.com/spring</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Short code</span><div style="border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:11px 10px;font:500 12px/1 'IBM Plex Mono',monospace;background:#fff">sho.rt<span style="color:#d8552a">»</span>spring-drop</div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">UTM preset</span><div style="display:flex;gap:6px;overflow:hidden"><span style="flex:none;background:#1b1a18;color:#e9e6e0;border-radius:999px;padding:8px 12px;font:500 11.5px/1 'IBM Plex Sans',sans-serif">IG bio</span><span style="flex:none;border:1px solid rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;background:#fff">IG story</span><span style="flex:none;border:1px solid rgba(0,0,0,.18);border-radius:999px;padding:8px 12px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;background:#fff">TikTok</span></div><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">horizontal scroll, snap</span></div>
+        <sc-for list="{{ mobileAccordions }}" as="a" hint-placeholder-count="3">
+          <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:12px;display:flex;align-items:center;gap:8px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;min-height:44px">{{ a.label }}<span style="margin-left:auto;font:400 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">{{ a.state }}</span><span style="color:rgba(0,0,0,.35)">▾</span></div>
+        </sc-for>
+      </div>
+      <span style="display:block;text-align:center;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);padding:8px">create link · sections collapse · 390</span>
+    </div>
+
+    <div style="width:390px;flex:none;background:#e9e6e0;border:1px solid rgba(0,0,0,.2);border-radius:14px;overflow:hidden">
+      <div style="background:#fff;border-bottom:1px solid rgba(0,0,0,.1);padding:11px 14px;display:flex;flex-direction:column;gap:3px"><span style="font:500 13px/1 'IBM Plex Mono',monospace">sho.rt<span style="color:#d8552a">»</span>spring-drop</span><span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">30d · bots excluded</span></div>
+      <div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:10px;display:flex;flex-direction:column;gap:3px"><span style="font:400 8.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.45)">{{ k.label }}</span><span style="font:600 16px/1 'IBM Plex Sans',sans-serif">{{ k.value }}</span><span style="font:400 9.5px/1 'IBM Plex Mono',monospace;color:{{ k.color }}">{{ k.delta }}</span></div>
+          </sc-for>
+        </div>
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:10px">
+          <svg sc-camel-view-box="0 0 320 110" width="100%" height="100" sc-camel-preserve-aspect-ratio="none"><line x1="0" y1="55" x2="320" y2="55" stroke="rgba(0,0,0,.07)"></line><polyline points="0,96 26,84 52,88 78,70 104,74 130,58 156,62 182,44 208,50 234,32 260,38 286,20 320,26" fill="none" stroke="#d8552a" stroke-width="2"></polyline></svg>
+        </div>
+        <div style="display:flex;gap:6px;overflow:hidden"><span style="flex:none;background:#1b1a18;color:#e9e6e0;border-radius:4px;padding:7px 11px;font:500 11px/1 'IBM Plex Sans',sans-serif">Referrers</span><span style="flex:none;background:#fff;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:7px 11px;font:400 11px/1 'IBM Plex Sans',sans-serif">Countries</span><span style="flex:none;background:#fff;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:7px 11px;font:400 11px/1 'IBM Plex Sans',sans-serif">Devices</span></div>
+        <div style="background:#fff;border:1px solid rgba(0,0,0,.12);border-radius:5px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ mobilePanelRows }}" as="r" hint-placeholder-count="4">
+            <div style="display:flex;flex-direction:column;gap:3px"><div style="display:flex;gap:8px;font:400 11.5px/1.3 'IBM Plex Sans',sans-serif"><span>{{ r.label }}</span><span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;color:rgba(0,0,0,.6)">{{ r.value }}</span></div><div style="height:5px;border-radius:2px;background:rgba(0,0,0,.06)"><div style="height:5px;border-radius:2px;background:rgba(216,85,42,.75);width:{{ r.pct }}"></div></div></div>
+          </sc-for>
+        </div>
+      </div>
+      <span style="display:block;text-align:center;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4);padding:8px">analytics · panels become tabs · 390</span>
+    </div>
+    <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+      <div style="width:min(340px,100%);border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">At phone width the table becomes cards, the sidebar becomes a bottom tab bar, row actions grow to 44px targets, and analytics breakdown panels collapse into a tab strip that swaps one panel at a time. Modals become full-height sheets.</div>
+    </sc-if>
+  </div>
+  </sc-if>

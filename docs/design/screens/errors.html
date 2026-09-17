@@ -1,0 +1,16 @@
+<sc-if value="{{ is.errors }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;max-width:1080px">
+    <sc-for list="{{ errorPages }}" as="e" hint-placeholder-count="4">
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:26px 22px;display:flex;flex-direction:column;gap:11px;align-items:center;text-align:center">
+        <span style="font:600 11px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35);letter-spacing:.1em">{{ e.code }}</span>
+        <span style="font:600 26px/1 'IBM Plex Mono',monospace;color:{{ e.color }}">{{ e.glyph }}</span>
+        <span style="font:600 15px/1.25 'IBM Plex Sans',sans-serif">{{ e.title }}</span>
+        <span style="font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55);max-width:28ch">{{ e.body }}</span>
+        <button type="button" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:7px 13px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">{{ e.cta }}</button>
+      </div>
+    </sc-for>
+  </div>
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+    <div style="max-width:1080px;border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">All four are server-rendered with the right status code (404 / 410 / 403 / 429) and share one template — glyph, heading, body, one action. The illustration style is always the chevron under stress: broken, stopped, dimmed, queued.</div>
+  </sc-if>
+  </sc-if>

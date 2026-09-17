@@ -1,0 +1,42 @@
+<sc-if value="{{ is.auth }}" hint-placeholder-val="{{ false }}">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(288px,1fr));gap:14px;max-width:1240px">
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:24px 22px;display:flex;flex-direction:column;gap:13px">
+      <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">1 · ENTER EMAIL</span>
+      <span style="display:flex;align-items:center;gap:7px;font:600 15px/1 'IBM Plex Sans',sans-serif"><span style="font:600 17px/1 'IBM Plex Mono',monospace;color:#d8552a">»</span>Sign in to short</span>
+      <span style="font:400 12px/1.55 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">No password. We email you a link that signs you in.</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:500 11.5px/1 'IBM Plex Sans',sans-serif">Email</span>
+        <div style="border:1px solid #1b1a18;border-radius:4px;padding:9px 11px;font:400 12.5px/1 'IBM Plex Mono',monospace;outline:2px solid rgba(216,85,42,.35);outline-offset:1px">you@agency.co<span style="opacity:.4">|</span></div>
+      </div>
+      <button type="button" sc-camel-on-click="{{ go.onboarding }}" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:10px 14px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:#c04a22">Email me a link</button>
+      <span style="font:400 11px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">By continuing you agree to the terms. Self-hosted instances set their own.</span>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:24px 22px;display:flex;flex-direction:column;gap:13px">
+      <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">2 · CHECK YOUR INBOX</span>
+      <span style="font:600 26px/1 'IBM Plex Mono',monospace;color:rgba(216,85,42,.6)">»&nbsp;✉</span>
+      <span style="font:600 15px/1.25 'IBM Plex Sans',sans-serif">Check your inbox</span>
+      <span style="font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">We sent a sign-in link to <span style="font-family:'IBM Plex Mono',monospace;color:#1b1a18">you@agency.co</span>. It expires in 15 minutes.</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" style="background:#fff;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:7px 12px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Resend</button>
+        <button type="button" style="background:none;border:0;padding:7px 4px;font:400 12px/1 'IBM Plex Sans',sans-serif;color:#b8471f;cursor:pointer">Change email</button>
+      </div>
+      <span style="font:400 11px/1.5 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">resend disabled for 45s after each send</span>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:24px 22px;display:flex;flex-direction:column;gap:13px;align-items:center;text-align:center;justify-content:center">
+      <span style="align-self:flex-start;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">3 · SIGNING IN</span>
+      <span style="width:22px;height:22px;border:2px solid rgba(0,0,0,.12);border-top-color:#d8552a;border-radius:50%;display:inline-block"></span>
+      <span style="font:600 14px/1.25 'IBM Plex Sans',sans-serif">Signing you in…</span>
+      <span style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);max-width:26ch">Verifying the link and creating your session.</span>
+    </div>
+    <div style="background:#fff;border:1px solid rgba(178,32,32,.35);border-radius:6px;padding:24px 22px;display:flex;flex-direction:column;gap:13px">
+      <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.4)">4 · LINK EXPIRED</span>
+      <span style="font:600 26px/1 'IBM Plex Mono',monospace;color:#b22020">»&nbsp;⊘</span>
+      <span style="font:600 15px/1.25 'IBM Plex Sans',sans-serif">This link no longer works</span>
+      <span style="font:400 12px/1.6 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.55)">Sign-in links expire after 15 minutes and can only be used once.</span>
+      <button type="button" sc-camel-on-click="{{ go.auth }}" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:9px 13px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer;align-self:flex-start" style-hover="background:#c04a22">Send a new link</button>
+    </div>
+  </div>
+  <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+    <div style="max-width:1240px;border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.65 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">Email submit is a normal POST → full page load to state 2 (so it survives no-JS). Resend is <span style="font-family:'IBM Plex Mono',monospace">hx-post /auth/resend</span> swapping just the button + cooldown text. State 3 is the GET on the magic URL; it redirects on success.</div>
+  </sc-if>
+  </sc-if>

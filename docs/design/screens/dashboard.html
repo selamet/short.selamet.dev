@@ -1,0 +1,120 @@
+<sc-if value="{{ is.dashboard }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;gap:14px;max-width:1240px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:10px 12px">
+      <button type="button" style="display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.04);border:1px solid rgba(0,0,0,.14);border-radius:4px;padding:6px 10px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.08)"><span style="width:16px;height:16px;border-radius:3px;background:#1b1a18;color:#d8552a;font:600 9px/16px 'IBM Plex Mono',monospace;text-align:center">A</span>Acme Social<span style="color:rgba(0,0,0,.4)">▾</span></button>
+      <div style="flex:1;min-width:180px;display:flex;align-items:center;gap:8px;border:1px solid rgba(0,0,0,.16);border-radius:4px;padding:7px 10px">
+        <span style="font:400 12px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.3)">⌕</span>
+        <span style="font:400 12.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.35)">Search links, codes, tags</span>
+        <span style="margin-left:auto;font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.3);border:1px solid rgba(0,0,0,.12);border-radius:3px;padding:2px 4px">/</span>
+      </div>
+      <button type="button" sc-camel-on-click="{{ go.newlink }}" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:8px 13px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:#c04a22">New link</button>
+      <span style="width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.1);font:500 11px/28px 'IBM Plex Sans',sans-serif;text-align:center;color:rgba(0,0,0,.5)">SL</span>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1;min-width:240px;display:flex;align-items:center;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:9px 11px;font:400 12.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35)">Paste a destination URL…</div>
+        <button type="button" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:9px 14px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:#c04a22">Shorten</button>
+        <button type="button" sc-camel-on-click="{{ go.newlink }}" style="background:none;border:1px solid rgba(0,0,0,.18);border-radius:4px;padding:8px 12px;font:500 12.5px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Advanced ▾</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;background:rgba(47,111,78,.08);border:1px solid rgba(47,111,78,.3);border-radius:4px;padding:8px 11px;flex-wrap:wrap">
+        <span style="font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:#2f6f4e">Created</span>
+        <span style="font:500 12.5px/1 'IBM Plex Mono',monospace">sho.rt<span style="color:#d8552a">»</span>k3f9xa</span>
+        <button type="button" style="background:#fff;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 8px;font:500 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">Copy</button>
+        <button type="button" sc-camel-on-click="{{ qrOpen }}" style="background:#fff;border:1px solid rgba(0,0,0,.18);border-radius:3px;padding:4px 8px;font:500 11px/1 'IBM Plex Sans',sans-serif;cursor:pointer" style-hover="background:rgba(0,0,0,.05)">QR</button>
+        <span style="margin-left:auto;font:400 11px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Toast auto-dismisses in 6s</span>
+      </div>
+      <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+        <div style="font:400 11.5px/1.4 'Architects Daughter',cursive;color:#b8471f;border-left:2px dashed rgba(216,85,42,.6);padding-left:8px">HTMX: form posts to /links/quick, swaps this result strip (<span style="font-family:'IBM Plex Mono',monospace">hx-swap-oob</span>) and prepends the new row into #link-rows. No page load.</div>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <sc-for list="{{ filterChips }}" as="c" hint-placeholder-count="5">
+        <span style="border:1px solid rgba(0,0,0,.18);border-radius:999px;padding:5px 11px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;background:#fff;color:rgba(0,0,0,.65)">{{ c }}</span>
+      </sc-for>
+      <span style="border:1px solid #1b1a18;border-radius:999px;padding:5px 11px;font:500 11.5px/1 'IBM Plex Sans',sans-serif;background:#1b1a18;color:#e9e6e0">tag: campaign ✕</span>
+      <span style="margin-left:auto;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.45)">Sort: newest ▾ · 42 links</span>
+    </div>
+
+    <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;overflow-x:auto"><div style="min-width:900px">
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;background:rgba(0,0,0,.04);border-bottom:1px solid rgba(0,0,0,.1);font:400 11.5px/1 'IBM Plex Sans',sans-serif">
+        <span style="width:13px;height:13px;border:1px solid rgba(0,0,0,.35);border-radius:2px;background:#1b1a18"></span>
+        <span style="font-weight:500">2 selected</span>
+        <span style="color:rgba(0,0,0,.3)">|</span>
+        <button type="button" style="background:none;border:0;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:#b8471f;cursor:pointer">Tag</button>
+        <button type="button" style="background:none;border:0;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:#b8471f;cursor:pointer">Archive</button>
+        <button type="button" style="background:none;border:0;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:#b8471f;cursor:pointer">Export CSV</button>
+      </div>
+      <div style="display:grid;grid-template-columns:28px 190px minmax(0,1fr) 140px 130px 92px 74px;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(0,0,0,.1);font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.09em;color:rgba(0,0,0,.42);text-transform:uppercase">
+        <span></span><span>Short code</span><span>Destination</span><span>Tags</span><span>Clicks · 7d</span><span>Status</span><span style="text-align:right">Actions</span>
+      </div>
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+        <div style="display:grid;grid-template-columns:28px 190px minmax(0,1fr) 140px 130px 92px 74px;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.07);align-items:center;font:400 12.5px/1.3 'IBM Plex Sans',sans-serif" style-hover="background:rgba(0,0,0,.025)">
+          <span style="width:13px;height:13px;border:1px solid rgba(0,0,0,.3);border-radius:2px"></span>
+          <span style="display:flex;align-items:center;gap:6px;min-width:0">
+            <span style="font:500 12.5px/1 'IBM Plex Mono',monospace;white-space:nowrap"><span style="color:rgba(0,0,0,.4)">sho.rt</span><span style="color:#d8552a">»</span>{{ r.code }}</span>
+            <button type="button" style="flex:none;background:none;border:1px solid rgba(0,0,0,.14);border-radius:3px;padding:2px 5px;font:400 9.5px/1.2 'IBM Plex Mono',monospace;color:rgba(0,0,0,.5);cursor:pointer" style-hover="border-color:#1b1a18;color:#1b1a18">copy</button>
+          </span>
+          <span style="display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden">
+            <span style="flex:none;width:14px;height:14px;border-radius:3px;background:rgba(0,0,0,.12)"></span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(0,0,0,.7)">{{ r.dest }}</span>
+            <sc-if value="{{ r.routed }}" hint-placeholder-val="{{ false }}">
+              <span style="flex:none;font:500 9.5px/1 'IBM Plex Mono',monospace;color:#b8471f;border:1px solid rgba(216,85,42,.5);border-radius:3px;padding:2px 4px">3 devices</span>
+            </sc-if>
+          </span>
+          <span style="display:flex;gap:4px;flex-wrap:wrap;min-width:0;overflow:hidden">
+            <sc-for list="{{ r.tags }}" as="t" hint-placeholder-count="1">
+              <span style="font:400 10.5px/1 'IBM Plex Sans',sans-serif;background:rgba(0,0,0,.06);border-radius:3px;padding:3px 6px;color:rgba(0,0,0,.6)">{{ t }}</span>
+            </sc-for>
+          </span>
+          <span style="display:flex;align-items:center;gap:8px">
+            <span style="font:500 12.5px/1 'IBM Plex Mono',monospace">{{ r.clicks }}</span>
+            <svg sc-camel-view-box="0 0 64 18" width="64" height="18" sc-camel-preserve-aspect-ratio="none"><polyline points="{{ r.spark }}" fill="none" stroke="#d8552a" stroke-width="1.5"></polyline></svg>
+          </span>
+          <span style="font:400 11px/1 'IBM Plex Sans',sans-serif;display:flex;align-items:center;gap:5px;color:rgba(0,0,0,.6)"><span style="width:6px;height:6px;border-radius:50%;background:{{ r.dot }}"></span>{{ r.status }}</span>
+          <span style="display:flex;gap:4px;justify-content:flex-end;color:rgba(0,0,0,.45);font:400 11px/1 'IBM Plex Mono',monospace">
+            <button type="button" sc-camel-on-click="{{ qrOpen }}" style="background:none;border:0;cursor:pointer;color:inherit;font:inherit" style-hover="color:#1b1a18">QR</button>
+            <button type="button" sc-camel-on-click="{{ go.analytics }}" style="background:none;border:0;cursor:pointer;color:inherit;font:inherit" style-hover="color:#1b1a18">📈</button>
+            <button type="button" sc-camel-on-click="{{ go.newlink }}" style="background:none;border:0;cursor:pointer;color:inherit;font:inherit" style-hover="color:#1b1a18">⋯</button>
+          </span>
+        </div>
+      </sc-for>
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;font:400 11.5px/1 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5)">
+        <span style="width:11px;height:11px;border:2px solid rgba(0,0,0,.15);border-top-color:#d8552a;border-radius:50%;display:inline-block"></span>Loading more rows…
+      </div>
+    </div></div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px">
+      <div style="background:#fff;border:1px dashed rgba(0,0,0,.22);border-radius:6px;padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:9px;align-items:center">
+        <div style="font:600 26px/1 'IBM Plex Mono',monospace;color:rgba(216,85,42,.5)">»&nbsp;&nbsp;&nbsp;</div>
+        <div style="font:600 13.5px/1.3 'IBM Plex Sans',sans-serif">No links yet</div>
+        <div style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);max-width:240px">Paste any URL above. We fetch the title, favicon and social card for you.</div>
+        <button type="button" style="background:#d8552a;color:#fff;border:0;border-radius:4px;padding:7px 12px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Create first link</button>
+        <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35)">empty state</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center">
+        <div style="font:600 13.5px/1.3 'IBM Plex Sans',sans-serif">No links match these filters</div>
+        <div style="font:400 11.5px/1.5 'IBM Plex Sans',sans-serif;color:rgba(0,0,0,.5);max-width:240px">tag: campaign · status: expired · last 7 days</div>
+        <button type="button" style="background:none;border:1px solid rgba(0,0,0,.2);border-radius:4px;padding:6px 11px;font:500 12px/1 'IBM Plex Sans',sans-serif;cursor:pointer">Clear filters</button>
+        <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35)">no-results state</span>
+      </div>
+      <div style="background:#fff;border:1px solid rgba(0,0,0,.14);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:9px">
+        <span style="font:400 10.5px/1 'IBM Plex Mono',monospace;color:rgba(0,0,0,.35)">loading state (HTMX partial)</span>
+        <sc-for list="{{ skeleton }}" as="k" hint-placeholder-count="4">
+          <div style="display:flex;gap:10px;align-items:center">
+            <span style="width:100px;height:11px;border-radius:2px;background:rgba(0,0,0,.09)"></span>
+            <span style="flex:1;height:11px;border-radius:2px;background:rgba(0,0,0,.06)"></span>
+            <span style="width:40px;height:11px;border-radius:2px;background:rgba(0,0,0,.09)"></span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-if value="{{ notes }}" hint-placeholder-val="{{ true }}">
+      <div style="border:1px dashed rgba(216,85,42,.55);border-radius:6px;padding:12px 14px;font:400 12px/1.6 'Architects Daughter',cursive;color:#8f3414;background:rgba(216,85,42,.05)">
+        Behaviour notes — filters &amp; sort: <span style="font-family:'IBM Plex Mono',monospace">hx-get /links?tag=…</span> targeting <span style="font-family:'IBM Plex Mono',monospace">#link-rows</span>, pushURL on. Row actions: copy is pure JS (clipboard + toast), QR opens a modal partial, ⋯ opens a dropdown menu partial, edit is a full page load. Bulk bar appears via <span style="font-family:'IBM Plex Mono',monospace">hx-swap-oob</span> when any checkbox changes. Infinite scroll uses <span style="font-family:'IBM Plex Mono',monospace">hx-trigger="revealed"</span>.
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
