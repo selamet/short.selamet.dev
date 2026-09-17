@@ -6,7 +6,7 @@ from django.contrib.auth import logout as auth_logout
 from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core import ratelimit
 from apps.core.http import client_ip
@@ -34,6 +34,15 @@ def _start_cooldown(email):
 def _cooldown_remaining(email):
     expires = cache.get(_cooldown_key(email))
     return max(0, int(expires - time.time())) if expires else 0
+
+
+def _inbox_context(email, rate_limited=False):
+    return {
+        "email": email,
+        "cooldown": _cooldown_remaining(email),
+        "rate_limited": rate_limited,
+        "rate_limit_message": RATE_LIMIT_MESSAGE,
+    }
 
 
 def _request_magic_link(request, email):
@@ -77,15 +86,12 @@ def login(request):
     return render(request, "accounts/login.html", {"form": form, "next": next_url})
 
 
+@require_GET
 def check_inbox(request):
     email = request.session.get(PENDING_EMAIL_SESSION_KEY)
     if not email:
         return redirect("accounts:login")
-    return render(
-        request,
-        "accounts/check_inbox.html",
-        {"email": email, "cooldown": _cooldown_remaining(email)},
-    )
+    return render(request, "accounts/check_inbox.html", _inbox_context(email))
 
 
 @require_POST
@@ -93,9 +99,10 @@ def resend(request):
     email = request.session.get(PENDING_EMAIL_SESSION_KEY)
     if not email:
         return redirect("accounts:login")
+    rate_limited = False
     if _cooldown_remaining(email) == 0:
-        _request_magic_link(request, email)
-    context = {"email": email, "cooldown": _cooldown_remaining(email)}
+        rate_limited = _request_magic_link(request, email) is None
+    context = _inbox_context(email, rate_limited=rate_limited)
     if request.headers.get("HX-Request"):
         return render(request, "accounts/partials/resend.html", context)
     return redirect("accounts:check_inbox")

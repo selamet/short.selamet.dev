@@ -14,7 +14,7 @@
     <input type="email" name="email" value="{{ form.email.value|default:'' }}" autocomplete="email" autofocus placeholder="you@agency.co" required
            class="rounded-sm border border-line bg-surface-2 px-3 py-2 text-[13px] focus:border-accent focus:outline-none"
            {% if form.email.errors %}aria-invalid="true" aria-describedby="email-error"{% endif %}>
-    {% if form.email.errors %}<span id="email-error" class="text-danger">{{ form.email.errors.0 }}</span>{% endif %}
+    {% if form.email.errors %}<span id="email-error" class="text-danger" role="alert">{{ form.email.errors.0 }}</span>{% endif %}
   </label>
   <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Email me a link</button>
 </form>
