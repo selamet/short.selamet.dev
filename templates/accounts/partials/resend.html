@@ -1,0 +1,8 @@
+<div id="resend" class="mt-6 flex flex-wrap items-center gap-3">
+  <form method="post" action="{% url 'accounts:resend' %}" hx-post="{% url 'accounts:resend' %}" hx-target="#resend" hx-swap="outerHTML">
+    {% csrf_token %}
+    <button type="submit" class="rounded-md border border-line px-3 py-2 font-medium hover:bg-surface-2 disabled:opacity-50" {% if cooldown %}disabled{% endif %}>Resend</button>
+  </form>
+  <a href="{% url 'accounts:login' %}" class="text-ink-muted underline">Change email</a>
+  {% if cooldown %}<span class="w-full text-[11.5px] text-ink-muted">Resend is disabled for {{ cooldown }}s after each send.</span>{% endif %}
+</div>

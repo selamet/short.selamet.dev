@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block body %}
+<main class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-12">
+  <p class="mono text-accent text-[13px]" aria-hidden="true">»</p>
+  <section class="mt-4 rounded-lg border border-line bg-surface p-6 shadow-e1">
+    {% block content %}{% endblock %}
+  </section>
+</main>
+{% endblock %}

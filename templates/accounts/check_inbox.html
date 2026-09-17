@@ -1,0 +1,8 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Check your inbox · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-accent" aria-hidden="true">» ✉</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">Check your inbox</h1>
+<p class="mt-2 text-ink-muted">We sent a sign-in link to <span class="mono text-ink">{{ email }}</span>. It expires in 15 minutes.</p>
+{% include "accounts/partials/resend.html" %}
+{% endblock %}
