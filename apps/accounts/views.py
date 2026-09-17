@@ -1,63 +1,33 @@
-import time
+import logging
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
-from django.core.cache import cache
 from django.shortcuts import redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from apps.core import ratelimit
 from apps.core.http import client_ip
-from apps.core.privacy import hash_ip
 
 from . import services
 from .forms import LoginForm
-from .tasks import send_magic_link
+
+logger = logging.getLogger("apps.accounts.views")
 
 PENDING_EMAIL_SESSION_KEY = "magic_link_email"
 LOGIN_NEXT_SESSION_KEY = "login_next"
 RATE_LIMIT_MESSAGE = "Too many sign-in links requested. Please wait a few minutes and try again."
 
 
-def _cooldown_key(email):
-    return f"magic-link-cooldown:{email.lower()}"
-
-
-def _start_cooldown(email):
-    seconds = settings.MAGIC_LINK_RESEND_COOLDOWN_SECONDS
-    if seconds:
-        cache.set(_cooldown_key(email), time.time() + seconds, timeout=seconds)
-
-
-def _cooldown_remaining(email):
-    expires = cache.get(_cooldown_key(email))
-    return max(0, int(expires - time.time())) if expires else 0
-
-
 def _inbox_context(email, rate_limited=False):
     return {
         "email": email,
-        "cooldown": _cooldown_remaining(email),
+        "cooldown": services.cooldown_remaining(email),
         "rate_limited": rate_limited,
         "rate_limit_message": RATE_LIMIT_MESSAGE,
     }
-
-
-def _request_magic_link(request, email):
-    """Enqueue a link for the email unless a rate limit is hit. Returns the user, or None."""
-    ip = client_ip(request)
-    allowed_for_email = ratelimit.hit("magic-link-email", email.lower(), limit=3, window=600)
-    allowed_for_ip = ratelimit.hit("magic-link-ip", ip, limit=20, window=3600)
-    if not (allowed_for_email and allowed_for_ip):
-        return None
-    user = services.get_or_create_user(email)
-    send_magic_link.enqueue(user.pk, ip_hash=hash_ip(ip))
-    _start_cooldown(user.email)
-    return user
 
 
 def _safe_next(request, candidate):
@@ -76,7 +46,7 @@ def login(request):
     next_url = _safe_next(request, request.GET.get("next") or request.POST.get("next"))
     form = LoginForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        user = _request_magic_link(request, form.cleaned_data["email"])
+        user = services.request_magic_link(form.cleaned_data["email"], client_ip(request))
         if user is not None:
             # Store the normalized address so later pages and the cooldown key agree.
             request.session[PENDING_EMAIL_SESSION_KEY] = user.email
@@ -104,8 +74,8 @@ def resend(request):
     if not email:
         return redirect("accounts:login")
     rate_limited = False
-    if _cooldown_remaining(email) == 0:
-        rate_limited = _request_magic_link(request, email) is None
+    if services.cooldown_remaining(email) == 0:
+        rate_limited = services.request_magic_link(email, client_ip(request)) is None
     context = _inbox_context(email, rate_limited=rate_limited)
     if request.headers.get("HX-Request"):
         return render(request, "accounts/partials/resend.html", context)
@@ -123,7 +93,9 @@ def verify(request, token):
     try:
         user = services.consume_magic_link(token)
     except services.InvalidMagicLink:
+        logger.warning("magic link rejected")
         return render(request, "accounts/link_expired.html", status=410)
+    logger.info("magic link sign-in user_id=%s", user.pk)
     auth_login(request, user)
     request.session.pop(PENDING_EMAIL_SESSION_KEY, None)
     next_url = request.session.pop(LOGIN_NEXT_SESSION_KEY, "") or settings.LOGIN_REDIRECT_URL

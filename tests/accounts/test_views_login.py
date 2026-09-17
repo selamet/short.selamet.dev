@@ -98,6 +98,12 @@ def test_login_stores_safe_next_only(client):
 
 
 @pytest.mark.django_db
+def test_login_accepts_full_same_host_next_url(client):
+    client.post(LOGIN + "?next=http://testserver/w/acme/", {"email": "ada@example.com"})
+    assert client.session["login_next"] == "http://testserver/w/acme/"
+
+
+@pytest.mark.django_db
 def test_authenticated_user_is_redirected_away_from_login(client):
     user = User.objects.create_user(email="ada@example.com")
     client.force_login(user)

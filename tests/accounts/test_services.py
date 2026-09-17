@@ -37,6 +37,15 @@ def test_consume_magic_link_returns_user_once(user):
         services.consume_magic_link(raw)
 
 
+def test_consume_rejects_link_expiring_exactly_now(user, monkeypatch):
+    raw = services.create_magic_link(user)
+    frozen_now = timezone.now()
+    MagicLink.objects.update(expires_at=frozen_now)
+    monkeypatch.setattr("django.utils.timezone.now", lambda: frozen_now)
+    with pytest.raises(services.InvalidMagicLink):
+        services.consume_magic_link(raw)
+
+
 def test_consume_rejects_expired_unknown_and_inactive(user):
     raw = services.create_magic_link(user)
     MagicLink.objects.update(expires_at=timezone.now() - timedelta(seconds=1))

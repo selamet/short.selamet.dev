@@ -42,6 +42,15 @@ def test_verify_post_logs_in_and_redirects(client, user):
     assert user.magic_links.get().used_at is not None
 
 
+def test_verify_post_while_signed_in_as_another_user_switches_session(client, user):
+    other = User.objects.create_user(email="other@example.com")
+    client.force_login(other)
+    raw = services.create_magic_link(user)
+    response = client.post(verify_url(raw))
+    assert response.status_code == 302
+    assert client.session["_auth_user_id"] == str(user.pk)
+
+
 def test_verify_post_honours_stored_next(client, user):
     raw = services.create_magic_link(user)
     session = client.session

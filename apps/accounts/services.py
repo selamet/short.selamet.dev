@@ -2,12 +2,17 @@
 
 import hashlib
 import secrets
+import time
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.db import transaction
 from django.urls import reverse
 from django.utils import timezone
+
+from apps.core import ratelimit
+from apps.core.privacy import hash_ip
 
 from .models import MagicLink, User
 
@@ -56,3 +61,43 @@ def consume_magic_link(raw_token):
 
 def magic_link_url(raw_token):
     return f"{settings.SITE_URL}{reverse('accounts:verify', args=[raw_token])}"
+
+
+def _cooldown_key(email):
+    return f"magic-link-cooldown:{email.lower()}"
+
+
+def start_cooldown(email):
+    seconds = settings.MAGIC_LINK_RESEND_COOLDOWN_SECONDS
+    if seconds:
+        cache.set(_cooldown_key(email), time.time() + seconds, timeout=seconds)
+
+
+def cooldown_remaining(email):
+    expires = cache.get(_cooldown_key(email))
+    return max(0, int(expires - time.time())) if expires else 0
+
+
+def request_magic_link(email, ip):
+    """Enqueue a link for the email unless a rate limit is hit. Returns the user, or None."""
+    # Imported lazily: apps.accounts.tasks imports this module at module load time.
+    from .tasks import send_magic_link
+
+    allowed_for_email = ratelimit.hit(
+        "magic-link-email",
+        email.lower(),
+        limit=settings.MAGIC_LINK_RATE_PER_EMAIL,
+        window=settings.MAGIC_LINK_RATE_PER_EMAIL_WINDOW,
+    )
+    allowed_for_ip = ratelimit.hit(
+        "magic-link-ip",
+        ip,
+        limit=settings.MAGIC_LINK_RATE_PER_IP,
+        window=settings.MAGIC_LINK_RATE_PER_IP_WINDOW,
+    )
+    if not (allowed_for_email and allowed_for_ip):
+        return None
+    user = get_or_create_user(email)
+    send_magic_link.enqueue(user.pk, ip_hash=hash_ip(ip))
+    start_cooldown(user.email)
+    return user
