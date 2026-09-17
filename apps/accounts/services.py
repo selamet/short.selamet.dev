@@ -54,8 +54,12 @@ def consume_magic_link(raw_token):
             raise InvalidMagicLink from None
         if not link.is_valid() or not link.user.is_active:
             raise InvalidMagicLink
-        link.used_at = timezone.now()
+        now = timezone.now()
+        link.used_at = now
         link.save(update_fields=["used_at"])
+        # Signing in with one link invalidates any other outstanding links for the
+        # same user, so an older, still-unused link can't be used after the fact.
+        MagicLink.objects.filter(user=link.user, used_at__isnull=True).update(used_at=now)
         return link.user
 
 
@@ -64,7 +68,7 @@ def magic_link_url(raw_token):
 
 
 def _cooldown_key(email):
-    return f"magic-link-cooldown:{email.lower()}"
+    return f"magic-link-cooldown:{ratelimit.hashed_identity(email.lower())}"
 
 
 def start_cooldown(email):

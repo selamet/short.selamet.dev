@@ -127,7 +127,9 @@ def test_resend_respects_cooldown_then_sends_again(client, settings):
     settings.MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 0
     from django.core.cache import cache
 
-    cache.delete("magic-link-cooldown:ada@example.com")
+    from apps.accounts import services
+
+    cache.delete(services._cooldown_key("ada@example.com"))
     after = client.post(RESEND, HTTP_HX_REQUEST="true")
     assert after.status_code == 200
     assert len(mail.outbox) == 2

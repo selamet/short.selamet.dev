@@ -37,6 +37,20 @@ def test_consume_magic_link_returns_user_once(user):
         services.consume_magic_link(raw)
 
 
+def test_consume_invalidates_the_users_other_unused_links(user):
+    services.create_magic_link(user)
+    raw2 = services.create_magic_link(user)
+    raw3 = services.create_magic_link(user)
+
+    services.consume_magic_link(raw2)
+
+    remaining = MagicLink.objects.filter(user=user).exclude(token_hash=services.hash_token(raw2))
+    assert remaining.count() == 2
+    assert all(link.used_at is not None for link in remaining)
+    with pytest.raises(services.InvalidMagicLink):
+        services.consume_magic_link(raw3)
+
+
 def test_consume_rejects_link_expiring_exactly_now(user, monkeypatch):
     raw = services.create_magic_link(user)
     frozen_now = timezone.now()
