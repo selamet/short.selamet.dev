@@ -1,0 +1,14 @@
+.git
+.venv
+.bin
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+staticfiles
+media
+docs
+node_modules

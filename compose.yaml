@@ -1,0 +1,25 @@
+# Production stack. TLS and routing are handled by the host's reverse proxy,
+# which forwards the public domain to the port published in a host-side override
+# (for example 127.0.0.1:8107 -> web:8000). Postgres and Redis are external.
+services:
+  web:
+    build: .
+    image: short:latest
+    env_file: .env
+    environment:
+      RUN_MIGRATIONS: "1"
+    volumes:
+      - media:/data/media
+    restart: unless-stopped
+  worker:
+    image: short:latest
+    env_file: .env
+    command: ["python", "manage.py", "db_worker", "--reload"]
+    volumes:
+      - media:/data/media
+    depends_on:
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  media:
