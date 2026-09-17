@@ -1,0 +1,46 @@
+[project]
+name = "short"
+version = "0.1.0"
+description = "Open-source, self-hostable URL shortener for social media teams."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=6.1,<6.2",
+    "django-environ>=0.14",
+    "psycopg[binary]>=3.3",
+    "redis>=6",
+    "django-tasks-db>=0.13",
+    "django-ninja>=1.7",
+    "whitenoise>=6.8",
+    "gunicorn>=23",
+    "sentry-sdk>=2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-django>=4.14",
+    "factory-boy>=3.3",
+    "ruff>=0.16",
+    "pre-commit>=4",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+exclude = ["**/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "DJ", "S", "T20"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+"config/settings/*" = ["F403", "F405"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
