@@ -1,5 +1,7 @@
 from django.conf import settings
 
+from config.settings.base import _mailer_from_url
+
 
 def test_short_domain_is_configured():
     assert settings.SHORT_DOMAIN == "sho.rt"
@@ -20,7 +22,35 @@ def test_tasks_use_immediate_backend_in_tests():
 
 
 def test_mailers_is_configured_without_deprecated_email_settings():
-    assert "default" in settings.MAILERS
-    assert (
-        not hasattr(settings, "EMAIL_BACKEND") or settings.is_overridden("EMAIL_BACKEND") is False
-    )
+    assert settings.MAILERS["default"]["BACKEND"].endswith("locmem.EmailBackend")
+    assert not hasattr(settings, "EMAIL_BACKEND")
+
+
+def test_mailer_from_url_maps_smtp_url_to_mailers_options():
+    mailer = _mailer_from_url("smtp+tls://user:secret@mail.example.com:587")
+    assert mailer == {
+        "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+        "OPTIONS": {
+            "host": "mail.example.com",
+            "port": 587,
+            "username": "user",
+            "password": "secret",
+            "use_tls": True,
+        },
+    }
+
+
+def test_mailer_from_url_maps_consolemail_url_with_no_options():
+    mailer = _mailer_from_url("consolemail://")
+    assert mailer == {
+        "BACKEND": "django.core.mail.backends.console.EmailBackend",
+        "OPTIONS": {},
+    }
+
+
+def test_mailer_from_url_maps_filemail_url_to_file_path_option():
+    mailer = _mailer_from_url("filemail:////data/mail")
+    assert mailer == {
+        "BACKEND": "django.core.mail.backends.filebased.EmailBackend",
+        "OPTIONS": {"file_path": "/data/mail"},
+    }
