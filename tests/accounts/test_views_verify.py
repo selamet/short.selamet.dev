@@ -81,8 +81,9 @@ def test_logout_requires_post_and_ends_session(client, user):
     assert "_auth_user_id" not in client.session
 
 
-def test_home_shows_sign_in_or_sign_out(client, user):
+def test_home_shows_sign_in_or_redirects_to_workspace_creation(client, user):
     assert "Sign in" in client.get("/").content.decode()
     client.force_login(user)
-    body = client.get("/").content.decode()
-    assert "Sign out" in body and "ada@example.com" in body
+    response = client.get("/")
+    assert response.status_code == 302
+    assert response.url == reverse("workspaces:create")

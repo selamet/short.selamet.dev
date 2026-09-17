@@ -7,6 +7,8 @@ from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
+from apps.workspaces.views import post_login
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,4 +41,6 @@ def health(request):
 
 
 def home(request):
+    if request.user.is_authenticated:
+        return post_login(request)
     return render(request, "core/home.html")

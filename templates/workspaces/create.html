@@ -1,0 +1,34 @@
+{% extends "accounts/_auth_base.html" %}
+{% block title %}Create workspace · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">First run · create workspace</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">Name your workspace</h1>
+<p class="mt-2 text-ink-muted">One workspace per brand or client. You can create more later.</p>
+<form method="post" class="mt-6 flex flex-col gap-4" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="rounded-md border border-danger px-3 py-2 text-danger" role="alert">{{ form.non_field_errors.0 }}</div>{% endif %}
+  <label class="flex flex-col gap-1">
+    <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Workspace name</span>
+    <input name="name" value="{{ form.name.value|default:'' }}" required maxlength="80" placeholder="Acme Social" autofocus
+           class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+    {% if form.name.errors %}<span class="text-danger" role="alert">{{ form.name.errors.0 }}</span>{% endif %}
+  </label>
+  <label class="flex flex-col gap-1">
+    <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Slug</span>
+    <span class="flex items-center gap-2">
+      <span class="mono text-ink-muted">{{ SHORT_DOMAIN }}/w/</span>
+      <input name="slug" value="{{ form.slug.value|default:'' }}" required maxlength="40" placeholder="acme-social"
+             class="mono flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"
+             hx-get="{% url 'workspaces:check_slug' %}" hx-trigger="keyup changed delay:300ms" hx-target="#slug-check" hx-include="this">
+    </span>
+    <span id="slug-check" class="text-[11.5px]">{% if form.slug.errors %}<span class="text-danger" role="alert">{{ form.slug.errors.0 }}</span>{% endif %}</span>
+  </label>
+  <label class="flex flex-col gap-1">
+    <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Timezone</span>
+    <select name="timezone" class="rounded-sm border border-line bg-surface-2 px-3 py-2">
+      {% for value, label in form.fields.timezone.choices %}<option value="{{ value }}" {% if value == form.timezone.value|default:'UTC' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Create workspace</button>
+</form>
+{% endblock %}
