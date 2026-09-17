@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from config.settings.base import _mailer_from_url
+from config.settings.base import _mailer_from_url, cache_from_url
 
 
 def test_short_domain_is_configured():
@@ -54,3 +54,9 @@ def test_mailer_from_url_maps_filemail_url_to_file_path_option():
         "BACKEND": "django.core.mail.backends.filebased.EmailBackend",
         "OPTIONS": {"file_path": "/data/mail"},
     }
+
+
+def test_cache_from_url_forces_the_builtin_redis_backend():
+    cache = cache_from_url("rediss://user:pw@host:6379/0")
+    assert cache["BACKEND"] == "django.core.cache.backends.redis.RedisCache"
+    assert cache["KEY_PREFIX"] == "short"

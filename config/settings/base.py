@@ -81,13 +81,19 @@ DATABASES = {
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+
+def cache_from_url(url):
+    """Translate a CACHE_URL into a Django CACHES entry, forcing the built-in Redis client."""
+    scheme = url.split("://", 1)[0]
+    cfg = environ.Env.cache_url_config(url)
+    if scheme in ("redis", "rediss"):
+        cfg["BACKEND"] = "django.core.cache.backends.redis.RedisCache"
+    cfg["KEY_PREFIX"] = "short"
+    return cfg
+
+
 # Redis is shared and ACL-scoped to the "short:*" key space.
-CACHES = {
-    "default": {
-        **env.cache("CACHE_URL", default="locmemcache://"),
-        "KEY_PREFIX": "short",
-    }
-}
+CACHES = {"default": cache_from_url(env("CACHE_URL", default="locmemcache://"))}
 
 TASKS = {
     "default": {
