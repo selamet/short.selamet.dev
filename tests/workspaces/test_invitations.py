@@ -39,6 +39,44 @@ def test_invite_existing_member_is_rejected(admin_membership, member_membership)
         services.invite(admin_membership, member_membership.user.email, Role.MEMBER)
 
 
+def test_duplicate_pending_invite_is_rejected(admin_membership):
+    services.invite(admin_membership, "dup@example.com", Role.MEMBER)
+    with pytest.raises(services.InvalidOperation):
+        services.invite(admin_membership, "dup@example.com", Role.MEMBER)
+    assert len(mail.outbox) == 1
+    assert Invitation.objects.filter(email="dup@example.com").count() == 1
+
+
+def test_revoking_a_pending_invite_lets_a_new_one_through(admin_membership):
+    services.invite(admin_membership, "dup@example.com", Role.MEMBER)
+    services.revoke_invitation(admin_membership, Invitation.objects.get(email="dup@example.com"))
+    services.invite(admin_membership, "dup@example.com", Role.MEMBER)
+    assert Invitation.objects.filter(email="dup@example.com").count() == 2
+    assert len(mail.outbox) == 2
+
+
+def test_invite_rate_limit_per_workspace_blocks_the_next_invite(admin_membership, settings):
+    settings.INVITE_RATE_PER_WORKSPACE = 20
+    for i in range(20):
+        services.invite(admin_membership, f"person{i}@example.com", Role.MEMBER)
+    with pytest.raises(services.InvalidOperation):
+        services.invite(admin_membership, "person20@example.com", Role.MEMBER)
+    assert len(mail.outbox) == 20
+
+
+def test_invite_rate_limit_per_workspace_does_not_affect_other_workspaces(admin_membership):
+    for i in range(20):
+        services.invite(admin_membership, f"person{i}@example.com", Role.MEMBER)
+    with pytest.raises(services.InvalidOperation):
+        services.invite(admin_membership, "person20@example.com", Role.MEMBER)
+
+    other_owner = User.objects.create_user(email="other-owner@example.com")
+    other_workspace = services.create_workspace(other_owner, name="Other Co", slug="other-co")
+    other_membership = Membership.objects.get(workspace=other_workspace, user=other_owner)
+    services.invite(other_membership, "fresh@example.com", Role.MEMBER)
+    assert Invitation.objects.filter(workspace=other_workspace).count() == 1
+
+
 def test_accept_invitation_creates_membership_once(admin_membership, outsider):
     raw = services.invite(admin_membership, outsider.email, Role.ADMIN)
     membership = services.accept_invitation(outsider, raw)

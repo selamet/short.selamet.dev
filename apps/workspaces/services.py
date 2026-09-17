@@ -11,6 +11,8 @@ from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.core import ratelimit
+
 from .models import Invitation, Membership, Role, Workspace
 from .permissions import can
 
@@ -158,6 +160,29 @@ def invite(actor, email, role):
     email = email.strip().lower()
     if Membership.objects.filter(workspace=actor.workspace, user__email__iexact=email).exists():
         raise InvalidOperation("This person is already a member.")
+    if Invitation.objects.filter(
+        workspace=actor.workspace,
+        email__iexact=email,
+        accepted_at__isnull=True,
+        expires_at__gt=timezone.now(),
+    ).exists():
+        raise InvalidOperation("An invitation is already pending for this address.")
+    # Both counters are always incremented, even when only one is exhausted, so a
+    # request that fails on the workspace limit still counts against the user limit.
+    allowed_for_workspace = ratelimit.hit(
+        "invite-workspace",
+        str(actor.workspace_id),
+        limit=settings.INVITE_RATE_PER_WORKSPACE,
+        window=settings.INVITE_RATE_PER_WORKSPACE_WINDOW,
+    )
+    allowed_for_user = ratelimit.hit(
+        "invite-user",
+        str(actor.user_id),
+        limit=settings.INVITE_RATE_PER_USER,
+        window=settings.INVITE_RATE_PER_USER_WINDOW,
+    )
+    if not (allowed_for_workspace and allowed_for_user):
+        raise InvalidOperation("Too many invitations. Try again in a while.")
     raw_token = secrets.token_urlsafe(32)
     invitation = Invitation.objects.create(
         workspace=actor.workspace,

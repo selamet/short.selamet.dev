@@ -76,6 +76,18 @@ def test_invite_existing_member_shows_error_full_page(client, admin_membership, 
     assert "Permissions" in body
 
 
+def test_invite_rate_limit_error_reaches_members_page(client, admin_membership, settings):
+    settings.INVITE_RATE_PER_WORKSPACE = 1
+    services.invite(admin_membership, "first@example.com", Role.MEMBER)
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("settings_members"), {"email": "second@example.com", "role": "member"}
+    )
+    assert response.status_code == 200
+    assert "Too many invitations" in response.content.decode()
+    assert not Invitation.objects.filter(email="second@example.com").exists()
+
+
 def test_change_role_and_remove(client, admin_membership, member_membership):
     client.force_login(admin_membership.user)
     response = client.post(
