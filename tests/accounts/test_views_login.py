@@ -65,7 +65,28 @@ def test_login_rate_limits_per_ip(client):
         assert client.post(LOGIN, {"email": f"u{i}@example.com"}).status_code == 302
     blocked = client.post(LOGIN, {"email": "u99@example.com"})
     assert blocked.status_code == 200
+    assert "Too many sign-in links" in blocked.content.decode()
     assert len(mail.outbox) == 20
+
+
+@pytest.mark.django_db
+def test_login_ip_limit_ignores_spoofed_forwarded_for(client):
+    # Only the entry TRUSTED_PROXY_HOPS positions from the end is trusted; the attacker
+    # can vary everything before it without getting a fresh rate-limit identity.
+    for i in range(20):
+        response = client.post(
+            LOGIN,
+            {"email": f"spoof{i}@example.com"},
+            HTTP_X_FORWARDED_FOR=f"9.9.9.{i}, 203.0.113.9",
+        )
+        assert response.status_code == 302
+    blocked = client.post(
+        LOGIN,
+        {"email": "spoof99@example.com"},
+        HTTP_X_FORWARDED_FOR="9.9.9.99, 203.0.113.9",
+    )
+    assert blocked.status_code == 200
+    assert "Too many sign-in links" in blocked.content.decode()
 
 
 @pytest.mark.django_db

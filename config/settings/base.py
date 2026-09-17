@@ -21,6 +21,9 @@ SITE_NAME = "short"
 
 # Absolute origin used in emails and other links generated outside a request.
 SITE_URL = env("SITE_URL", default=f"http://{SHORT_DOMAIN}")
+# Number of reverse proxies in front of the app that append to X-Forwarded-For;
+# 0 = trust REMOTE_ADDR only.
+TRUSTED_PROXY_HOPS = env.int("TRUSTED_PROXY_HOPS", default=1)
 MAGIC_LINK_TTL_MINUTES = 15
 MAGIC_LINK_RESEND_COOLDOWN_SECONDS = 45
 
