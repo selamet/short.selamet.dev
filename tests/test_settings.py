@@ -17,3 +17,10 @@ def test_cache_keys_are_prefixed_for_redis_acl():
 
 def test_tasks_use_immediate_backend_in_tests():
     assert settings.TASKS["default"]["BACKEND"].endswith("ImmediateBackend")
+
+
+def test_mailers_is_configured_without_deprecated_email_settings():
+    assert "default" in settings.MAILERS
+    assert (
+        not hasattr(settings, "EMAIL_BACKEND") or settings.is_overridden("EMAIL_BACKEND") is False
+    )

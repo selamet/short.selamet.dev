@@ -116,8 +116,26 @@ STORAGES = {
 MEDIA_URL = "/media/"
 MEDIA_ROOT = env("MEDIA_ROOT", default=str(BASE_DIR / "media"))
 
-EMAIL_CONFIG = env.email("EMAIL_URL", default="consolemail://")
-vars().update(EMAIL_CONFIG)
+
+def _mailer_from_url(url):
+    """Translate an EMAIL_URL into a Django 6 MAILERS entry."""
+    cfg = environ.Env.email_url_config(url)
+    options = {}
+    for setting, option in (
+        ("EMAIL_HOST", "host"),
+        ("EMAIL_PORT", "port"),
+        ("EMAIL_HOST_USER", "username"),
+        ("EMAIL_HOST_PASSWORD", "password"),
+        ("EMAIL_USE_TLS", "use_tls"),
+        ("EMAIL_USE_SSL", "use_ssl"),
+        ("EMAIL_FILE_PATH", "file_path"),
+    ):
+        if setting in cfg and cfg[setting] not in (None, ""):
+            options[option] = cfg[setting]
+    return {"BACKEND": cfg["EMAIL_BACKEND"], "OPTIONS": options}
+
+
+MAILERS = {"default": _mailer_from_url(env("EMAIL_URL", default="consolemail://"))}
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="short <no-reply@localhost>")
 
 ADMIN_URL_PATH = env("ADMIN_URL_PATH", default="admin")

@@ -10,7 +10,7 @@ DEBUG = False
 ALLOWED_HOSTS = ["testserver", "localhost", "sho.rt"]
 SHORT_DOMAIN = "sho.rt"
 TASKS = {"default": {"BACKEND": "django.tasks.backends.immediate.ImmediateBackend"}}
-EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+MAILERS = {"default": {"BACKEND": "django.core.mail.backends.locmem.EmailBackend"}}
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.InMemoryStorage"},
