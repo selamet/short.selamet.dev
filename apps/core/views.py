@@ -3,6 +3,7 @@ import logging
 from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET
 
@@ -35,3 +36,7 @@ def health(request):
             result["status"] = "degraded"
     status = 200 if result["status"] == "ok" else 503
     return JsonResponse(result, status=status)
+
+
+def home(request):
+    return render(request, "core/home.html")

@@ -23,6 +23,10 @@ htmlcov/
 # Node / Tailwind
 node_modules/
 
+# Built assets and downloaded tooling
+/static/css/
+/.bin/
+
 # GeoIP databases (licensed, download separately)
 *.mmdb
 
