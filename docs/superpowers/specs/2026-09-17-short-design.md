@@ -26,14 +26,19 @@ Plus analytics (total/unique clicks, time series, referrers, countries, cities, 
 | Phase 1 platform features | OG override + auto fetch, device routing + deep links, UTM presets |
 | Phase 2 | Link-in-bio page, geo/language routing, A/B split, password links, expiry UI, browser extension |
 | Auth | Magic link only, no passwords |
-| Deployment | Single VPS, Docker Compose with `web`, `worker`, `caddy`. PostgreSQL and Redis are external, connected via `DATABASE_URL` / `REDIS_URL` |
+| Deployment | Single VPS. Docker Compose runs `web` and `worker` only; TLS termination and routing are done by the host's Caddy, which proxies the domain to a localhost port defined in a host-side compose override. PostgreSQL (behind PgBouncer in transaction pool mode, TLS) and Redis (TLS, ACL scoped to the `short:*` key space) are external shared services reached via `DATABASE_URL` / `CACHE_URL` |
 | Frontend | Django templates + HTMX + Tailwind v4 (standalone CLI) + Chart.js. No SPA, no bundler |
 | API | django-ninja under `/api/v1/` |
-| Background work | Django 6 `django.tasks` API; `ImmediateBackend` in dev/test, `django-tasks` `DatabaseBackend` in production |
+| Background work | Django 6 `django.tasks` API; `ImmediateBackend` in dev/test, `django-tasks-db` (`django_tasks_db.backend.DatabaseBackend`) in production |
 | License | MIT |
 | Language | Everything in the repo is English |
 
 ## 2. Project structure
+
+### Infrastructure constraints
+- PostgreSQL is reached through PgBouncer in transaction pool mode: `CONN_MAX_AGE = 0`, `DISABLE_SERVER_SIDE_CURSORS = True`, `sslmode=verify-full` in the URL.
+- Redis is TLS-only (`rediss://`) and the app's ACL user may only touch keys matching `short:*`, on db 0. Django's built-in `RedisCache` with `KEY_PREFIX = "short"` is the only Redis client; no raw Redis usage outside the cache API.
+- No server hostnames, IPs or credentials in the repository; everything comes from environment variables documented in `.env.example`.
 
 ```
 short/
@@ -50,7 +55,7 @@ short/
 ├── static/            # Tailwind output, vendored HTMX and Chart.js
 ├── extension/         # phase 2, separate spec
 ├── docs/
-├── compose.yaml       # web, worker, caddy (production)
+├── compose.yaml       # web, worker (production; the host's Caddy terminates TLS)
 ├── compose.dev.yaml   # local postgres + redis
 └── pyproject.toml     # uv, ruff, pytest
 ```
@@ -100,13 +105,13 @@ Unique click definition: same `ip_hash` + `user_agent` for the same link within 
 
 Social crawlers (facebookexternalhit, Twitterbot, WhatsApp, Slackbot, LinkedInBot, TelegramBot, Discordbot) receive an HTML page containing only the OG meta tags instead of a redirect. These requests are not counted as clicks. Other bot detection happens in the task, not the view.
 
-Failure behavior: Redis unavailable → fall through to PostgreSQL and log. PostgreSQL unavailable → 503 with `Retry-After: 5`. Enqueue failure → click is dropped, redirect still happens, error goes to Sentry. Principle: redirect first, measurement second.
+Failure behavior: Cache unavailable → fall through to PostgreSQL and log. PostgreSQL unavailable → 503 with `Retry-After: 5`. Enqueue failure → click is dropped, redirect still happens, error goes to Sentry. Principle: redirect first, measurement second.
 
 `record_click` task: hash IP with the daily salt, resolve country/city with GeoLite2, parse the user agent, flag bots, write `ClickEvent`, atomically increment `Link.click_count`, upsert `DailyLinkStat` and `DailyLinkBreakdown`. A nightly task recomputes the previous day's rollups from raw events as a consistency check.
 
 ## 5. Tasks and worker
 
-Tasks use Django 6's `django.tasks` (`@task`, `.enqueue()`). Backend: `ImmediateBackend` in dev/test, `django_tasks.backends.database.DatabaseBackend` in production. The worker runs `manage.py db_worker` from the same image as `web`.
+Tasks use Django 6's `django.tasks` (`@task`, `.enqueue()`). Backend: `ImmediateBackend` in dev/test, `django_tasks_db.backend.DatabaseBackend` (package `django-tasks-db`) in production. The worker runs `manage.py db_worker` from the same image as `web`.
 
 | Task | Trigger | Work |
 |---|---|---|
@@ -139,7 +144,7 @@ Error handling: tasks are idempotent (ClickEvent duplicate check on `link_id + o
 - One `require_role(...)` decorator for views; service functions also check roles so API and dashboard enforce the same rules. Access to a workspace the user is not a member of returns 404.
 
 ### REST API (`/api/v1/`, django-ninja)
-- Auth: `Authorization: Bearer sk_live_...`. Key is hashed and looked up in `ApiKey`; `last_used_at` updated. A key belongs to one workspace, so endpoints carry no workspace parameter.
+- Auth: `Authorization: Bearer short_...`. Key is hashed and looked up in `ApiKey`; `last_used_at` updated. A key belongs to one workspace, so endpoints carry no workspace parameter.
 - Endpoints: `GET/POST /links`, `GET/PATCH /links/{code}`, `POST /links/{code}/archive`, `GET /links/{code}/stats` (summary + time series, date range params), `GET /links/{code}/qr`, `GET/POST /tags`, `GET /utm-presets`, `GET /me`.
 - Rate limit: 120 requests/min per key → 429 with `Retry-After`.
 - OpenAPI docs at `/api/v1/docs`.
@@ -150,7 +155,7 @@ Error handling: tasks are idempotent (ClickEvent duplicate check on `link_id + o
 
 Screens follow `docs/design/claude-design-prompt.md` (landing, preview page, error pages, auth, onboarding, links list, link form, link analytics, workspace analytics, QR modal, bulk import, workspace settings, account settings, global patterns).
 
-- Templates: `base.html` → `dashboard/base.html` → pages. Every list, table and panel lives in `partials/` so full-page render and HTMX swap share the same markup. `django-template-partials` for inline partials.
+- Templates: `base.html` → `dashboard/base.html` → pages. Every list, table and panel lives in `partials/` so full-page render and HTMX swap share the same markup. Django 6's built-in `{% partialdef %}` for inline partials.
 - Full page loads: navigation between main pages, saving the link form. HTMX swaps: list filtering/search/pagination, row actions, slug availability check, OG preview refresh, analytics date range changes, QR modal, invite form. Modals and slide-overs load via `hx-get` into a single `#modal` container.
 - No native `alert`/`confirm`; custom confirmation modal for destructive actions.
 - Tailwind v4 standalone CLI, no Node. Design tokens from Claude Design go into `@theme`. Compiled CSS is not committed; built in Docker.
@@ -175,7 +180,7 @@ Total custom JS: roughly 100 lines. No bundler.
 
 ## 9. Testing and development workflow
 
-- pytest + pytest-django + factory_boy. `fakeredis` for Redis, `ImmediateBackend` for tasks.
+- pytest + pytest-django + factory_boy. All Redis access goes through Django's cache API, so tests run on `LocMemCache`; `ImmediateBackend` for tasks.
 - Unit tests for services: base62 generation and collisions, URL validation, UTM merging, platform detection, unique click counting, role checks.
 - Integration tests for the redirect view: cache hit/miss, negative cache, device targets, deep link page, crawler OG page, expired link, Redis-down fallback.
 - Task tests: `record_click` output, rollup idempotency.
