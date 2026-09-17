@@ -1,9 +1,14 @@
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401
-from .base import MAILERS, env
+from .base import ALLOWED_HOSTS, MAILERS, env
 
 DEBUG = False
+
+# The container HEALTHCHECK and host-side probes talk to the app over loopback, so the
+# loopback names must pass host validation next to the public domain(s).
+LOOPBACK_HOSTS = ["127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [*ALLOWED_HOSTS, *(h for h in LOOPBACK_HOSTS if h not in ALLOWED_HOSTS)]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
