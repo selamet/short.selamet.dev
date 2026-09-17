@@ -40,6 +40,14 @@ INVITE_RATE_PER_USER_WINDOW = env.int("INVITE_RATE_PER_USER_WINDOW", default=360
 # Slug availability check rate limit, enforced in apps.workspaces.views.check_slug.
 SLUG_CHECK_RATE = env.int("SLUG_CHECK_RATE", default=60)
 SLUG_CHECK_RATE_WINDOW = env.int("SLUG_CHECK_RATE_WINDOW", default=60)
+LINK_CODE_LENGTH = env.int("LINK_CODE_LENGTH", default=7)
+BLOCKED_LINK_DOMAINS = env.list("BLOCKED_LINK_DOMAINS", default=[])
+LINK_RATE_PER_USER = env.int("LINK_RATE_PER_USER", default=60)
+LINK_RATE_PER_USER_WINDOW = env.int("LINK_RATE_PER_USER_WINDOW", default=60)
+LINK_RATE_PER_WORKSPACE = env.int("LINK_RATE_PER_WORKSPACE", default=300)
+LINK_RATE_PER_WORKSPACE_WINDOW = env.int("LINK_RATE_PER_WORKSPACE_WINDOW", default=3600)
+LINK_METADATA_TIMEOUT = env.float("LINK_METADATA_TIMEOUT", default=5.0)
+LINK_METADATA_MAX_BYTES = env.int("LINK_METADATA_MAX_BYTES", default=2 * 1024 * 1024)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
