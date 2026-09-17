@@ -14,10 +14,24 @@ from django.core.exceptions import ValidationError
 ALLOWED_SCHEMES = {"http", "https"}
 
 
+def _normalize_host(host):
+    """Lowercase and drop a trailing dot, so "example.com." can't dodge a string check
+    that "example.com" would fail."""
+    return (host or "").strip().rstrip(".").lower()
+
+
+def _idna(host):
+    """Punycode form of a host, so a Unicode entry and its ASCII form compare equal."""
+    try:
+        return host.encode("idna").decode("ascii")
+    except UnicodeError:
+        return host
+
+
 def is_blocked_host(host):
-    host = (host or "").lower().rstrip(".")
+    host = _idna(_normalize_host(host))
     for blocked in settings.BLOCKED_LINK_DOMAINS:
-        blocked = blocked.lower().strip()
+        blocked = _idna(_normalize_host(blocked))
         if blocked and (host == blocked or host.endswith(f".{blocked}")):
             return True
     return False
@@ -48,15 +62,27 @@ def resolves_to_private_address(host):
     return any(_is_private(ipaddress.ip_address(info[4][0])) for info in infos)
 
 
+def _rebuild_netloc(parts, host):
+    """Re-assemble netloc from the normalized host, keeping any port and userinfo."""
+    netloc_host = f"[{host}]" if ":" in host else host
+    netloc = netloc_host if parts.port is None else f"{netloc_host}:{parts.port}"
+    if parts.username:
+        userinfo = (
+            parts.username if parts.password is None else f"{parts.username}:{parts.password}"
+        )
+        netloc = f"{userinfo}@{netloc}"
+    return netloc
+
+
 def validate_destination(url, check_dns=False):
     url = (url or "").strip()
     parts = urlsplit(url)
     if parts.scheme.lower() not in ALLOWED_SCHEMES or not parts.netloc:
         raise ValidationError("Enter a full URL starting with http:// or https://.")
-    host = (parts.hostname or "").lower()
+    host = _normalize_host(parts.hostname)
     if not host:
         raise ValidationError("Enter a full URL starting with http:// or https://.")
-    short_host = settings.SHORT_DOMAIN.split(":")[0].lower()
+    short_host = _normalize_host(settings.SHORT_DOMAIN.split(":")[0])
     if host == short_host or host == "localhost" or host.endswith(".localhost"):
         raise ValidationError("That address points back at this shortener.")
     if is_blocked_host(host):
@@ -68,5 +94,5 @@ def validate_destination(url, check_dns=False):
         pass
     if check_dns and resolves_to_private_address(host):
         raise ValidationError("Private and local addresses cannot be used as destinations.")
-    netloc = parts.netloc.lower()
+    netloc = _rebuild_netloc(parts, host)
     return urlunsplit((parts.scheme.lower(), netloc, parts.path, parts.query, parts.fragment))

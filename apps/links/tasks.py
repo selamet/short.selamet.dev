@@ -1,6 +1,7 @@
 """Fetch the destination's title, favicon and Open Graph tags out of band."""
 
 import logging
+import time
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
 
@@ -45,27 +46,50 @@ class _MetadataParser(HTMLParser):
             self.title = data.strip()
 
 
+def _open_stream(client, url):
+    """Thin seam over httpx.Client.stream so tests can fake responses without a socket."""
+    return client.stream("GET", url)
+
+
 def _fetch_html(url):
-    """Download the destination, re-validating it and capping size and redirects."""
-    destinations.validate_destination(url, check_dns=True)
+    """Download the destination, validating every redirect hop and capping size, time
+    and hop count.
+
+    httpx's own `follow_redirects=True` only validates the URL it is given and the one
+    it lands on, so a destination could redirect through an internal address in between.
+    Redirects are therefore followed by hand, re-validating (including DNS) before each
+    hop is requested.
+    """
+    deadline = time.monotonic() + settings.LINK_METADATA_TOTAL_TIMEOUT
+    current_url = destinations.validate_destination(url, check_dns=True)
+    timeout = httpx.Timeout(settings.LINK_METADATA_TIMEOUT)
     with httpx.Client(
-        timeout=settings.LINK_METADATA_TIMEOUT,
-        follow_redirects=True,
-        max_redirects=3,
+        timeout=timeout,
+        follow_redirects=False,
         headers={"User-Agent": f"{settings.SITE_NAME}-metadata/1.0"},
     ) as client:
-        with client.stream("GET", url) as response:
-            response.raise_for_status()
-            destinations.validate_destination(str(response.url), check_dns=True)
-            if "html" not in response.headers.get("content-type", ""):
-                return ""
-            chunks, size = [], 0
-            for chunk in response.iter_bytes():
-                size += len(chunk)
-                if size > settings.LINK_METADATA_MAX_BYTES:
-                    break
-                chunks.append(chunk)
-    return b"".join(chunks).decode("utf-8", errors="replace")
+        for _ in range(settings.LINK_METADATA_MAX_REDIRECTS + 1):
+            if time.monotonic() > deadline:
+                raise TimeoutError("metadata fetch exceeded its deadline")
+            with _open_stream(client, current_url) as response:
+                if response.is_redirect:
+                    location = response.headers.get("location", "")
+                    next_url = urljoin(current_url, location)
+                    current_url = destinations.validate_destination(next_url, check_dns=True)
+                    continue
+                response.raise_for_status()
+                if "html" not in response.headers.get("content-type", ""):
+                    return ""
+                chunks, size = [], 0
+                for chunk in response.iter_bytes():
+                    if time.monotonic() > deadline:
+                        break
+                    size += len(chunk)
+                    if size > settings.LINK_METADATA_MAX_BYTES:
+                        break
+                    chunks.append(chunk)
+                return b"".join(chunks).decode("utf-8", errors="replace")
+    raise RuntimeError("too many redirects")
 
 
 def extract_metadata(url):

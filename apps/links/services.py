@@ -77,16 +77,23 @@ def set_tags(actor, link, names):
         name = (raw or "").strip().lower()
         if not name:
             continue
-        tag = Tag.objects.filter(workspace=link.workspace, name__iexact=name).first()
-        if tag is None:
-            tag = Tag.objects.create(workspace=link.workspace, name=name)
+        # get_or_create still races: two concurrent creates for the same new name can
+        # both miss the SELECT and then collide on the unique constraint. Django's own
+        # retry inside get_or_create re-queries with an exact match, which misses a row
+        # saved under different casing, so fall back to an explicit case-insensitive read.
+        try:
+            tag, _created = Tag.objects.get_or_create(workspace=link.workspace, name=name)
+        except IntegrityError:
+            tag = Tag.objects.get(workspace=link.workspace, name__iexact=name)
         tags.append(tag)
     link.tags.set(tags)
     return tags
 
 
-def set_targets(link, rows):
+def set_targets(actor, link, rows):
     """Replace the per-device rows. An empty list turns device routing off."""
+    _require_manage(actor)
+    _require_same_workspace(actor, link)
     cleaned = []
     for row in rows or []:
         platform = (row.get("platform") or "").strip()
@@ -149,18 +156,20 @@ def create_link(actor, destination_url, code="", tags=None, targets=None, **fiel
                 ),
                 **values,
             )
+            if tags:
+                set_tags(actor, link, tags)
+            if targets:
+                set_targets(actor, link, targets)
     except IntegrityError as error:
         raise ValidationError("That code is already taken.") from error
-    if tags:
-        set_tags(actor, link, tags)
-    if targets:
-        set_targets(link, targets)
     logger.info(
         "link.create workspace=%s actor=%s code=%s", link.workspace_id, actor.user_id, link.code
     )
     from .tasks import fetch_link_metadata
 
-    fetch_link_metadata.enqueue(link.pk)
+    # Deferred until commit: enqueuing before the row is durably saved could hand the
+    # metadata task a link_id no other transaction can see yet.
+    transaction.on_commit(lambda: fetch_link_metadata.enqueue(link.pk))
     return link
 
 
@@ -193,19 +202,19 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     try:
         with transaction.atomic():
             link.save(update_fields=sorted(set(changed)) or None)
+            if tags is not None:
+                set_tags(actor, link, tags)
+            if targets is not None:
+                set_targets(actor, link, targets)
     except IntegrityError as error:
         raise ValidationError("That code is already taken.") from error
-    if tags is not None:
-        set_tags(actor, link, tags)
-    if targets is not None:
-        set_targets(link, targets)
     logger.info(
         "link.update workspace=%s actor=%s code=%s", link.workspace_id, actor.user_id, link.code
     )
     if "destination_url" in changed:
         from .tasks import fetch_link_metadata
 
-        fetch_link_metadata.enqueue(link.pk)
+        transaction.on_commit(lambda: fetch_link_metadata.enqueue(link.pk))
     return link
 
 

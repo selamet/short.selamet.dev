@@ -48,6 +48,10 @@ LINK_RATE_PER_WORKSPACE = env.int("LINK_RATE_PER_WORKSPACE", default=300)
 LINK_RATE_PER_WORKSPACE_WINDOW = env.int("LINK_RATE_PER_WORKSPACE_WINDOW", default=3600)
 LINK_METADATA_TIMEOUT = env.float("LINK_METADATA_TIMEOUT", default=5.0)
 LINK_METADATA_MAX_BYTES = env.int("LINK_METADATA_MAX_BYTES", default=2 * 1024 * 1024)
+# Overall wall-clock budget for a metadata fetch, across every redirect hop.
+LINK_METADATA_TOTAL_TIMEOUT = env.float("LINK_METADATA_TOTAL_TIMEOUT", default=10.0)
+# Maximum redirect hops a metadata fetch will follow before giving up.
+LINK_METADATA_MAX_REDIRECTS = env.int("LINK_METADATA_MAX_REDIRECTS", default=3)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

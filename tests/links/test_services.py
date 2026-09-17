@@ -1,5 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
+from django.db.models.query import QuerySet
 
 from apps.links import services
 from apps.links.models import Link, Tag
@@ -55,6 +57,7 @@ def test_create_link_stores_utm_and_tags(owner_membership):
 def test_set_targets_replaces_rows_and_validates(owner_membership):
     link = services.create_link(owner_membership, destination_url="https://example.com")
     services.set_targets(
+        owner_membership,
         link,
         [
             {
@@ -72,19 +75,39 @@ def test_set_targets_replaces_rows_and_validates(owner_membership):
         ],
     )
     assert set(link.targets.values_list("platform", flat=True)) == {"ios", "android"}
-    services.set_targets(link, [])
+    services.set_targets(owner_membership, link, [])
     assert link.targets.count() == 0
     with pytest.raises(ValidationError):
         services.set_targets(
-            link, [{"platform": "ios", "url": "", "app_url": "instagram://x", "fallback_url": ""}]
+            owner_membership,
+            link,
+            [{"platform": "ios", "url": "", "app_url": "instagram://x", "fallback_url": ""}],
         )
     with pytest.raises(ValidationError):
         services.set_targets(
+            owner_membership,
             link,
             [
                 {
                     "platform": "desktop",
                     "url": "javascript:alert(1)",
+                    "app_url": "",
+                    "fallback_url": "",
+                }
+            ],
+        )
+
+
+def test_set_targets_rejects_a_link_from_another_workspace(owner_membership, other_membership):
+    link = services.create_link(owner_membership, destination_url="https://example.com")
+    with pytest.raises(services.InvalidOperation):
+        services.set_targets(
+            other_membership,
+            link,
+            [
+                {
+                    "platform": "android",
+                    "url": "https://m.example.com",
                     "app_url": "",
                     "fallback_url": "",
                 }
@@ -128,3 +151,36 @@ def test_code_available_ignores_archived_links_never(owner_membership):
     services.archive_link(owner_membership, link)
     assert services.code_available("taken") is False
     assert services.code_available("taken", exclude=link) is True
+
+
+def test_create_link_leaves_no_link_behind_when_targets_are_invalid(owner_membership):
+    with pytest.raises(ValidationError):
+        services.create_link(
+            owner_membership,
+            destination_url="https://example.com",
+            targets=[
+                {
+                    "platform": "desktop",
+                    "url": "javascript:alert(1)",
+                    "app_url": "",
+                    "fallback_url": "",
+                }
+            ],
+        )
+    assert Link.objects.count() == 0
+
+
+def test_set_tags_recovers_from_a_concurrent_create_race(owner_membership, monkeypatch):
+    link = services.create_link(owner_membership, destination_url="https://example.com")
+    existing = Tag.objects.create(workspace=link.workspace, name="Campaign")
+
+    def flaky_create(self, **kwargs):
+        raise IntegrityError("duplicate tag")
+
+    # get_or_create ultimately calls QuerySet.create; patching it simulates two
+    # concurrent requests colliding on the unique constraint after both missed the
+    # initial SELECT. "Campaign" was seeded with different casing on purpose, so this
+    # also proves the fallback re-query is case-insensitive.
+    monkeypatch.setattr(QuerySet, "create", flaky_create)
+    tags = services.set_tags(owner_membership, link, ["campaign"])
+    assert tags == [existing]

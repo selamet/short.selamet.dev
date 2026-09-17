@@ -43,3 +43,27 @@ def test_blocked_domains_are_rejected_including_subdomains(settings):
     assert destinations.is_blocked_host("notbad.example") is False
     with pytest.raises(ValidationError):
         destinations.validate_destination("https://bad.example/x")
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://sho.rt./abc", "http://localhost./x"],
+)
+def test_a_trailing_dot_does_not_bypass_the_self_reference_check(url, settings):
+    settings.SHORT_DOMAIN = "sho.rt"
+    with pytest.raises(ValidationError):
+        destinations.validate_destination(url)
+
+
+def test_a_trailing_dot_does_not_bypass_the_blocklist(settings):
+    settings.BLOCKED_LINK_DOMAINS = ["bad.example"]
+    assert destinations.is_blocked_host("bad.example.") is True
+    with pytest.raises(ValidationError):
+        destinations.validate_destination("https://bad.example./x")
+
+
+def test_is_blocked_host_matches_across_unicode_and_punycode(settings):
+    settings.BLOCKED_LINK_DOMAINS = ["café.example"]
+    assert destinations.is_blocked_host("xn--caf-dma.example") is True
+    settings.BLOCKED_LINK_DOMAINS = ["xn--caf-dma.example"]
+    assert destinations.is_blocked_host("café.example") is True
