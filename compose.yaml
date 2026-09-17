@@ -7,6 +7,8 @@ services:
     image: short:latest
     env_file: .env
     environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      TASKS_BACKEND: django_tasks_db.backend.DatabaseBackend
       RUN_MIGRATIONS: "1"
     volumes:
       - media:/data/media
@@ -14,12 +16,17 @@ services:
   worker:
     image: short:latest
     env_file: .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      TASKS_BACKEND: django_tasks_db.backend.DatabaseBackend
     command: ["python", "manage.py", "db_worker"]
     volumes:
       - media:/data/media
     depends_on:
       web:
         condition: service_healthy
+    healthcheck:
+      disable: true
     restart: unless-stopped
 volumes:
   media:

@@ -27,7 +27,8 @@ WORKDIR /app
 COPY --from=deps /opt/venv /opt/venv
 COPY --chown=app:app . .
 COPY --from=assets --chown=app:app /app/static/css/app.css static/css/app.css
-RUN SECRET_KEY=build DATABASE_URL=sqlite:///build.db python manage.py collectstatic --noinput \
+RUN SECRET_KEY=build DATABASE_URL=sqlite:///build.db EMAIL_URL=smtp://build.invalid:25 \
+    python manage.py collectstatic --noinput \
     && rm -f build.db && chmod +x docker/entrypoint.sh && mkdir -p /data/media && chown -R app:app /data
 USER app
 EXPOSE 8000
