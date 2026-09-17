@@ -1,4 +1,4 @@
-<div id="invitations">
+<div id="invitations"{% if oob %} hx-swap-oob="true"{% endif %}>
   {% if invitations %}
   <h2 class="mt-8 text-[15px] font-semibold">Pending invitations</h2>
   <ul class="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">

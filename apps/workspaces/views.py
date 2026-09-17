@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import services
@@ -71,6 +72,10 @@ def invitation_accept(request, token):
         invitation = services.get_pending_invitation(token)
     except services.InvalidInvitation:
         return render(request, "workspaces/invitation_invalid.html", status=410)
+    if request.user.email.lower() != invitation.email.lower():
+        return render(
+            request, "workspaces/invitation_mismatch.html", {"invitation": invitation}, status=403
+        )
     if request.method == "POST":
         membership = services.accept_invitation(request.user, token)
         messages.success(request, f"You joined {membership.workspace.name}.")
@@ -84,9 +89,14 @@ def invitation_accept(request, token):
 @require_POST
 def invitation_decline(request, token):
     try:
-        services.decline_invitation(token)
+        invitation = services.get_pending_invitation(token)
     except services.InvalidInvitation:
         return render(request, "workspaces/invitation_invalid.html", status=410)
+    if request.user.email.lower() != invitation.email.lower():
+        return render(
+            request, "workspaces/invitation_mismatch.html", {"invitation": invitation}, status=403
+        )
+    services.decline_invitation(request.user, token)
     return redirect("workspaces:index")
 
 
@@ -108,7 +118,9 @@ def _members_context(request, form=None):
         "section": "members",
         "form": form or InviteForm(),
         "members": request.workspace.memberships.select_related("user").order_by("created_at"),
-        "invitations": [i for i in request.workspace.invitations.all() if i.is_pending],
+        "invitations": request.workspace.invitations.filter(
+            accepted_at__isnull=True, expires_at__gt=timezone.now()
+        ),
         "matrix": PERMISSIONS,
         "roles": [Role.OWNER, Role.ADMIN, Role.MEMBER],
     }
@@ -118,6 +130,7 @@ def _members_context(request, form=None):
 @require_http_methods(["GET", "POST"])
 def settings_members(request, slug):
     form = InviteForm(request.POST or None)
+    is_hx = request.headers.get("HX-Request")
     if request.method == "POST" and form.is_valid():
         try:
             services.invite(
@@ -126,15 +139,16 @@ def settings_members(request, slug):
         except services.InvalidOperation as error:
             form.add_error("email", str(error))
         else:
-            form = None
-            if request.headers.get("HX-Request"):
+            if is_hx:
                 return render(
                     request,
-                    "workspaces/settings/partials/invitation_list.html",
+                    "workspaces/settings/partials/invite_response.html",
                     _members_context(request),
                 )
             messages.success(request, "Invitation sent.")
             return redirect("workspaces:settings_members", slug=slug)
+    if request.method == "POST" and is_hx:
+        return render(request, "workspaces/settings/partials/invite_form.html", {"form": form})
     return render(request, "workspaces/settings/members.html", _members_context(request, form))
 
 
@@ -152,11 +166,7 @@ def member_role(request, slug, pk):
     except services.InvalidOperation as error:
         return HttpResponseBadRequest(str(error))
     if request.headers.get("HX-Request"):
-        return render(
-            request,
-            "workspaces/settings/partials/member_row.html",
-            {"m": target, "matrix": PERMISSIONS},
-        )
+        return render(request, "workspaces/settings/partials/member_row.html", {"m": target})
     return redirect("workspaces:settings_members", slug=slug)
 
 

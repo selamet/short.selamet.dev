@@ -6,6 +6,7 @@ from django.core import mail
 from django.urls import reverse
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.workspaces import services
 from apps.workspaces.models import Invitation, Membership, Role
 
@@ -96,3 +97,54 @@ def test_login_next_survives_invite_link(client, admin_membership):
     response = client.get(url)
     assert response.status_code == 302
     assert f"next={url}" in response.url.replace("%2F", "/")
+
+
+def test_accept_invitation_rejects_mismatched_email(admin_membership, outsider):
+    stranger = User.objects.create_user(email="stranger@example.com")
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    with pytest.raises(services.InvitationEmailMismatch):
+        services.accept_invitation(stranger, raw)
+    assert not Membership.objects.filter(user=stranger).exists()
+
+
+def test_decline_invitation_rejects_mismatched_email(admin_membership, outsider):
+    stranger = User.objects.create_user(email="stranger@example.com")
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    with pytest.raises(services.InvitationEmailMismatch):
+        services.decline_invitation(stranger, raw)
+    assert Invitation.objects.get().is_pending is True
+
+
+def test_invitation_accept_page_rejects_mismatched_email(client, admin_membership, outsider):
+    stranger = User.objects.create_user(email="stranger@example.com")
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    accept_url = reverse("workspaces:invitation_accept", args=[raw])
+    client.force_login(stranger)
+
+    get_response = client.get(accept_url)
+    assert get_response.status_code == 403
+    assert outsider.email in get_response.content.decode()
+
+    post_response = client.post(accept_url)
+    assert post_response.status_code == 403
+    assert not Membership.objects.filter(user=stranger).exists()
+
+
+def test_invitation_decline_page_rejects_mismatched_email(client, admin_membership, outsider):
+    stranger = User.objects.create_user(email="stranger@example.com")
+    raw = services.invite(admin_membership, outsider.email, Role.MEMBER)
+    client.force_login(stranger)
+    response = client.post(reverse("workspaces:invitation_decline", args=[raw]))
+    assert response.status_code == 403
+    assert outsider.email in response.content.decode()
+    assert Invitation.objects.get().is_pending is True
+
+
+def test_invitation_accept_allows_case_insensitive_email_match(client, admin_membership):
+    user = User.objects.create_user(email="Fresh@Example.com")
+    raw = services.invite(admin_membership, "fresh@example.com", Role.MEMBER)
+    accept_url = reverse("workspaces:invitation_accept", args=[raw])
+    client.force_login(user)
+    response = client.post(accept_url)
+    assert response.status_code == 302
+    assert Membership.objects.filter(user=user, workspace__slug="acme-social").exists()

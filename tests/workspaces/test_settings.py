@@ -1,5 +1,8 @@
+import pytest
 from django.urls import reverse
 
+from apps.accounts.models import User
+from apps.workspaces import services
 from apps.workspaces.models import Invitation, Membership, Role, Workspace
 
 
@@ -42,17 +45,35 @@ def test_invite_from_members_page(client, admin_membership):
         HTTP_HX_REQUEST="true",
     )
     assert response.status_code == 200
-    assert "new@example.com" in response.content.decode()
+    body = response.content.decode()
+    assert "new@example.com" in body
+    assert 'id="invite-form"' in body
+    assert 'name="email" value=""' in body
     assert Invitation.objects.filter(email="new@example.com").exists()
 
 
 def test_invite_existing_member_shows_error(client, admin_membership, member_membership):
     client.force_login(admin_membership.user)
     response = client.post(
+        url("settings_members"),
+        {"email": member_membership.user.email, "role": "member"},
+        HTTP_HX_REQUEST="true",
+    )
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert "already a member" in body
+    assert "Permissions" not in body
+
+
+def test_invite_existing_member_shows_error_full_page(client, admin_membership, member_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(
         url("settings_members"), {"email": member_membership.user.email, "role": "member"}
     )
     assert response.status_code == 200
-    assert "already a member" in response.content.decode()
+    body = response.content.decode()
+    assert "already a member" in body
+    assert "Permissions" in body
 
 
 def test_change_role_and_remove(client, admin_membership, member_membership):
@@ -83,8 +104,6 @@ def test_owner_row_cannot_be_changed(client, admin_membership, owner_membership)
 
 
 def test_revoke_invitation(client, admin_membership):
-    from apps.workspaces import services
-
     client.force_login(admin_membership.user)
     services.invite(admin_membership, "x@example.com", Role.MEMBER)
     invitation = Invitation.objects.get()
@@ -119,3 +138,45 @@ def test_delete_requires_matching_slug(client, owner_membership):
     response = client.post(url("delete"), {"confirm_slug": "acme-social"})
     assert response.status_code == 302 and response.url == reverse("workspaces:index")
     assert not Workspace.objects.exists()
+
+
+@pytest.fixture
+def other_workspace():
+    owner = User.objects.create_user(email="other-owner@example.com")
+    return services.create_workspace(owner, name="Other Co", slug="other-co")
+
+
+@pytest.fixture
+def other_membership(other_workspace):
+    user = User.objects.create_user(email="other-member@example.com")
+    return Membership.objects.create(workspace=other_workspace, user=user, role=Role.MEMBER)
+
+
+def test_member_role_rejects_cross_workspace_target(client, admin_membership, other_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(
+        url("member_role", "acme-social", other_membership.pk), {"role": "admin"}
+    )
+    assert response.status_code == 404
+    other_membership.refresh_from_db()
+    assert other_membership.role == Role.MEMBER
+
+
+def test_member_remove_rejects_cross_workspace_target(client, admin_membership, other_membership):
+    client.force_login(admin_membership.user)
+    response = client.post(url("member_remove", "acme-social", other_membership.pk))
+    assert response.status_code == 404
+    assert Membership.objects.filter(pk=other_membership.pk).exists()
+
+
+def test_invitation_revoke_rejects_cross_workspace_invitation(
+    client, admin_membership, other_workspace
+):
+    other_owner_membership = Membership.objects.get(workspace=other_workspace, role=Role.OWNER)
+    services.invite(other_owner_membership, "target@example.com", Role.MEMBER)
+    invitation = Invitation.objects.get(email="target@example.com")
+    client.force_login(admin_membership.user)
+    response = client.post(url("invitation_revoke", "acme-social", invitation.pk))
+    assert response.status_code == 404
+    invitation.refresh_from_db()
+    assert invitation.is_pending is True

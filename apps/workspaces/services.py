@@ -41,6 +41,10 @@ class InvalidInvitation(Exception):
     """Unknown, expired, revoked or already accepted invitation."""
 
 
+class InvitationEmailMismatch(Exception):
+    """The signed-in user's email does not match the invited address."""
+
+
 def normalize_slug(slug):
     # Lowercase only: unlike slugify(), this must not paper over invalid input
     # (leading/trailing hyphens, internal spaces) by rewriting it into something valid.
@@ -191,6 +195,8 @@ def get_pending_invitation(raw_token):
 @transaction.atomic
 def accept_invitation(user, raw_token):
     invitation = get_pending_invitation(raw_token)
+    if user.email.lower() != invitation.email.lower():
+        raise InvitationEmailMismatch
     invitation = Invitation.objects.select_for_update().get(pk=invitation.pk)
     if not invitation.is_pending:
         raise InvalidInvitation
@@ -203,7 +209,9 @@ def accept_invitation(user, raw_token):
     return membership
 
 
-def decline_invitation(raw_token):
+def decline_invitation(user, raw_token):
     invitation = get_pending_invitation(raw_token)
+    if user.email.lower() != invitation.email.lower():
+        raise InvitationEmailMismatch
     invitation.expires_at = timezone.now()
     invitation.save(update_fields=["expires_at"])
