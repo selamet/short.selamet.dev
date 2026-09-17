@@ -1,0 +1,8 @@
+<div id="invitations">
+  {% if invitations %}
+  <h2 class="mt-8 text-[15px] font-semibold">Pending invitations</h2>
+  <ul class="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
+    {% for i in invitations %}{% include "workspaces/settings/partials/invitation_row.html" %}{% endfor %}
+  </ul>
+  {% endif %}
+</div>

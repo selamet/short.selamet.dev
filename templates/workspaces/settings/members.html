@@ -1,0 +1,31 @@
+{% extends "workspaces/settings/_base.html" %}
+{% block settings %}
+<form method="post" hx-post="{% url 'workspaces:settings_members' current_workspace.slug %}" hx-target="#invitations" hx-swap="outerHTML" class="flex flex-wrap items-end gap-3" novalidate>
+  {% csrf_token %}
+  <label class="flex flex-1 flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Invite by email</span>
+    <input type="email" name="email" value="{{ form.email.value|default:'' }}" placeholder="name@company.com" required class="rounded-sm border border-line bg-surface-2 px-3 py-2"></label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Role</span>
+    <select name="role" class="rounded-sm border border-line bg-surface-2 px-3 py-2"><option value="member">Member</option><option value="admin">Admin</option></select></label>
+  <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Invite</button>
+  {% if form.email.errors %}<span class="w-full text-danger" role="alert">{{ form.email.errors.0 }}</span>{% elif form.non_field_errors %}<span class="w-full text-danger" role="alert">{{ form.non_field_errors.0 }}</span>{% endif %}
+</form>
+
+<h2 class="mt-8 text-[15px] font-semibold">Members</h2>
+<ul class="mt-2 divide-y divide-line rounded-lg border border-line bg-surface">
+  {% for m in members %}{% include "workspaces/settings/partials/member_row.html" %}{% endfor %}
+</ul>
+
+{% include "workspaces/settings/partials/invitation_list.html" %}
+
+<h2 class="mt-8 text-[15px] font-semibold">Permissions</h2>
+<table class="mt-2 w-full text-left text-[12.5px]">
+  <thead><tr class="text-[11px] uppercase tracking-wide text-ink-muted"><th class="py-2">Permission</th><th>Owner</th><th>Admin</th><th>Member</th></tr></thead>
+  <tbody>
+    <tr><td class="py-2">Create &amp; edit links</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <tr><td class="py-2">View analytics</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    <tr><td class="py-2">Invite &amp; manage members</td><td>✓</td><td>✓</td><td>—</td></tr>
+    <tr><td class="py-2">Manage API keys</td><td>✓</td><td>✓</td><td>—</td></tr>
+    <tr><td class="py-2">Delete or transfer workspace</td><td>✓</td><td>—</td><td>—</td></tr>
+  </tbody>
+</table>
+{% endblock %}

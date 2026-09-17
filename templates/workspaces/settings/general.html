@@ -1,0 +1,15 @@
+{% extends "workspaces/settings/_base.html" %}
+{% block settings %}
+<form method="post" class="flex max-w-md flex-col gap-4" novalidate>
+  {% csrf_token %}
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Workspace name</span>
+    <input name="name" value="{{ form.name.value|default:'' }}" required maxlength="80" class="rounded-sm border border-line bg-surface-2 px-3 py-2">
+    {% if form.name.errors %}<span class="text-danger" role="alert">{{ form.name.errors.0 }}</span>{% endif %}</label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Slug</span>
+    <input name="slug" value="{{ form.slug.value|default:'' }}" required maxlength="40" class="mono rounded-sm border border-line bg-surface-2 px-3 py-2">
+    {% if form.slug.errors %}<span class="text-danger" role="alert">{{ form.slug.errors.0 }}</span>{% endif %}</label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Timezone</span>
+    <select name="timezone" class="rounded-sm border border-line bg-surface-2 px-3 py-2">{% for value, label in form.fields.timezone.choices %}<option value="{{ value }}" {% if value == form.timezone.value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+  <button type="submit" class="self-start rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Save changes</button>
+</form>
+{% endblock %}

@@ -76,6 +76,21 @@ def create_workspace(user, name, slug, timezone="UTC"):
     return workspace
 
 
+def update_workspace(actor, name, slug, timezone):
+    _require(actor, "workspace.settings")
+    workspace = actor.workspace
+    slug = validate_slug(slug)
+    if slug != workspace.slug and not slug_is_available(slug):
+        raise ValidationError("This slug is already taken.")
+    workspace.name, workspace.slug, workspace.timezone = name.strip(), slug, timezone
+    try:
+        with transaction.atomic():
+            workspace.save(update_fields=["name", "slug", "timezone"])
+    except IntegrityError:
+        raise ValidationError("This slug is already taken.") from None
+    return workspace
+
+
 def _require(membership, permission):
     if not can(membership, permission):
         raise PermissionDenied(permission)

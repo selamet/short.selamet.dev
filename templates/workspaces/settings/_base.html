@@ -1,0 +1,13 @@
+{% extends "workspaces/_shell.html" %}
+{% block title %}Settings · {{ current_workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h1 class="text-[20px] font-semibold">Settings</h1>
+<div class="mt-6 flex flex-col gap-6 md:flex-row">
+  <nav class="flex gap-2 md:w-48 md:flex-col" aria-label="Settings">
+    <a class="rounded-md px-3 py-2 {% if section == 'general' %}bg-surface-2 font-medium{% endif %}" href="{% url 'workspaces:settings_general' current_workspace.slug %}">General</a>
+    <a class="rounded-md px-3 py-2 {% if section == 'members' %}bg-surface-2 font-medium{% endif %}" href="{% url 'workspaces:settings_members' current_workspace.slug %}">Members</a>
+    {% if request.membership.role == 'owner' %}<a class="rounded-md px-3 py-2 text-danger {% if section == 'danger' %}bg-surface-2 font-medium{% endif %}" href="{% url 'workspaces:settings_danger' current_workspace.slug %}">Danger zone</a>{% endif %}
+  </nav>
+  <section class="min-w-0 flex-1">{% block settings %}{% endblock %}</section>
+</div>
+{% endblock %}

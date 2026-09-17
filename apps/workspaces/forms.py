@@ -33,3 +33,15 @@ class InviteForm(forms.Form):
     role = forms.ChoiceField(
         choices=[(Role.MEMBER, "Member"), (Role.ADMIN, "Admin")], initial=Role.MEMBER
     )
+
+
+class RoleForm(forms.Form):
+    role = forms.ChoiceField(choices=[(Role.MEMBER, "Member"), (Role.ADMIN, "Admin")])
+
+
+class TransferForm(forms.Form):
+    membership = forms.IntegerField()
+
+
+class DeleteForm(forms.Form):
+    confirm_slug = forms.CharField(max_length=40)

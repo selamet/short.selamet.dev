@@ -17,7 +17,7 @@
     {% if current_workspace %}
     <nav class="flex flex-col gap-1 px-2" aria-label="Workspace">
       <a class="rounded-md px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:dashboard' current_workspace.slug %}">Links</a>
-      <a class="rounded-md px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:dashboard' current_workspace.slug %}">Settings</a>
+      <a class="rounded-md px-3 py-2 hover:bg-surface-2" href="{% url 'workspaces:settings_general' current_workspace.slug %}">Settings</a>
       {% block nav_extra %}{% endblock %}
     </nav>
     {% endif %}
