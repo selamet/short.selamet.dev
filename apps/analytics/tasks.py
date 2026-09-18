@@ -150,13 +150,26 @@ def _coerce_day(day):
 @task
 def rebuild_daily_stats(day=None):
     """Recompute DailyLinkStat, DailyLinkBreakdown and DailyClickIdentity for `day`
-    (UTC yesterday by default) for every link with at least one click that day,
-    correcting anything the incremental path in rollups.apply_event() might have
-    missed. Meant to run once a night; also callable with an explicit date (a date
-    or an ISO string) to repair or backfill a single day.
+    (UTC yesterday by default) and for `day - 1`, for every link with at least one
+    click that day, correcting anything the incremental path in
+    rollups.apply_event() might have missed. Meant to run once a night; also
+    callable with an explicit date (a date or an ISO string) to repair or backfill a
+    single day (and the day before it).
+
+    Redoing `day - 1` as well as `day` matters for a workspace west of UTC: this
+    job's default `day` is UTC "yesterday", but a workspace several hours behind UTC
+    (say, US Pacific) has its own local "yesterday" still open when a run picks that
+    UTC date -- some of its clicks for that local day have not happened yet. Only
+    ever rebuilding `day` would then leave that workspace's local day exactly as the
+    incremental path left it forever: by the time tomorrow's run rolls `day` forward
+    to what is now that local day's UTC date, the incremental path has already had a
+    full day to run against it with nothing to correct it, and the run after that
+    has already moved on. Rebuilding `day - 1` too means the very next run, one day
+    later, corrects it -- at the cost of one extra day of (idempotent) work every
+    night.
 
     Each workspace picks its own timezone (Workspace.timezone), so which raw
-    ClickEvent rows actually fall on `day` differs link by link. Rather than
+    ClickEvent rows actually fall on a given day differs link by link. Rather than
     duplicating that per-workspace conversion here, this scans every event in a
     window wide enough to cover any timezone offset (see
     apps.analytics.queries.padded_utc_window, shared with hour_weekday_matrix()
@@ -164,6 +177,25 @@ def rebuild_daily_stats(day=None):
     uses -- which day each one lands on.
     """
     day = _coerce_day(day) or (timezone.now().date() - timedelta(days=1))
+    for target_day in (day - timedelta(days=1), day):
+        _rebuild_daily_stats_for_day(target_day)
+
+
+def _rebuild_daily_stats_for_day(day):
+    retention_floor = timezone.now().date() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
+    if day < retention_floor:
+        # purge_click_events has already deleted (or soon will delete) this day's raw
+        # ClickEvent rows; rebuilding it would find none of them and overwrite its
+        # existing rollups with all-zero totals instead of leaving them alone -- the
+        # rollups are the entire point of keeping them once the raw events behind
+        # them are gone (see purge_click_events's own docstring).
+        logger.warning(
+            "rebuild_daily_stats day=%s refused: older than CLICK_EVENT_RETENTION_DAYS=%d, its "
+            "raw events are already purged",
+            day,
+            settings.CLICK_EVENT_RETENTION_DAYS,
+        )
+        return
     window_start, window_end = padded_utc_window(day, day)
     candidates = ClickEvent.objects.filter(
         occurred_at__gte=window_start, occurred_at__lt=window_end

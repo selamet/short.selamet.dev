@@ -10,6 +10,7 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db.models import QuerySet
+from django.utils import timezone
 
 from apps.analytics import rollups
 from apps.analytics.management.commands import enqueue_scheduled
@@ -82,6 +83,62 @@ def test_rebuild_daily_stats_with_an_explicit_date_rebuilds_that_day(link):
     rebuild_daily_stats.enqueue(day.isoformat())
 
     assert DailyLinkStat.objects.get(link=link, date=day).clicks == 1
+
+
+@pytest.mark.django_db
+def test_rebuild_daily_stats_also_corrects_the_previous_local_day_for_a_western_workspace(
+    membership,
+):
+    # I4: Honolulu is UTC-10, no DST, so an event just after UTC midnight on
+    # `yesterday` still falls on the day before that in Honolulu's own calendar --
+    # its rollup belongs to `yesterday - 1`, a day the old single-day rebuild (only
+    # ever `yesterday`) would never revisit for a workspace this far west of UTC.
+    membership.workspace.timezone = "Pacific/Honolulu"
+    membership.workspace.save(update_fields=["timezone"])
+    link = link_services.create_link(
+        membership, destination_url="https://example.com/hi", code="honolulu-link"
+    )
+    yesterday = datetime.now(tz=UTC).date() - timedelta(days=1)
+    day_before = yesterday - timedelta(days=1)
+    event = _event(link, occurred_at=datetime.combine(yesterday, time(0, 30), tzinfo=UTC))
+    assert rollups.local_date(event) == day_before
+    rollups.apply_event(event)
+    DailyLinkStat.objects.filter(link=link, date=day_before).update(clicks=999, unique_clicks=999)
+
+    rebuild_daily_stats.enqueue()
+
+    stat = DailyLinkStat.objects.get(link=link, date=day_before)
+    assert (stat.clicks, stat.unique_clicks) == (1, 1)
+
+
+@pytest.mark.django_db
+def test_rebuild_daily_stats_refuses_a_day_past_retention_and_leaves_it_alone(
+    settings, link, caplog
+):
+    settings.CLICK_EVENT_RETENTION_DAYS = 90
+    stale_day = timezone.now().date() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS + 1)
+    DailyLinkStat.objects.create(
+        link=link, workspace=link.workspace, date=stale_day, clicks=5, unique_clicks=5
+    )
+
+    with caplog.at_level(logging.WARNING, logger="apps.analytics.tasks"):
+        rebuild_daily_stats.enqueue(stale_day.isoformat())
+
+    stat = DailyLinkStat.objects.get(link=link, date=stale_day)
+    assert stat.clicks == 5  # left untouched, not zeroed out
+    assert "refused" in caplog.text
+
+
+@pytest.mark.django_db
+def test_rebuild_daily_stats_processes_a_day_exactly_at_the_retention_boundary(settings, link):
+    settings.CLICK_EVENT_RETENTION_DAYS = 90
+    boundary_day = timezone.now().date() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
+    rollups.apply_event(_event(link, occurred_at=_at_noon(boundary_day)))
+    DailyLinkStat.objects.filter(link=link, date=boundary_day).update(clicks=999)
+
+    rebuild_daily_stats.enqueue(boundary_day.isoformat())
+
+    assert DailyLinkStat.objects.get(link=link, date=boundary_day).clicks == 1
 
 
 # --- purge_click_events ---------------------------------------------------------------
