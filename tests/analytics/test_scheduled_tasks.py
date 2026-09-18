@@ -182,6 +182,24 @@ def test_purge_click_events_logs_how_many_it_removed(caplog, link):
     assert "events=2" in caplog.text
 
 
+@pytest.mark.django_db
+def test_purge_click_events_stops_after_the_configured_batch_budget(settings, link, caplog):
+    # I7: a small batch size and a budget of one batch must delete only that one
+    # batch's worth of rows and log that it stopped early, leaving the rest for the
+    # next scheduled run instead of running unbounded against the whole backlog.
+    settings.ANALYTICS_PURGE_BATCH_SIZE = 2
+    settings.ANALYTICS_PURGE_MAX_BATCHES = 1
+    old = datetime.now(tz=UTC) - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS + 1)
+    for i in range(5):
+        _event(link, occurred_at=old, ip_hash=f"budget-{i}")
+
+    with caplog.at_level(logging.WARNING, logger="apps.analytics.tasks"):
+        purge_click_events.enqueue()
+
+    assert ClickEvent.objects.filter(ip_hash__startswith="budget-").count() == 3
+    assert "stopped early" in caplog.text
+
+
 # --- rotate_ip_salt ---------------------------------------------------------------------
 
 
@@ -308,6 +326,49 @@ def test_expire_links_never_disables_a_link_without_invalidating_it(
     # the next run instead (every 10 minutes -- see docker/crontab).
     assert racing_link.status == Link.Status.ACTIVE
     assert redirect_cache.get_payload(racing_link.code) is not None
+
+
+@pytest.mark.django_db
+def test_expire_links_does_not_resurrect_a_link_archived_before_the_update_runs(
+    membership, monkeypatch, django_capture_on_commit_callbacks
+):
+    """I9: the disabling UPDATE used to be scoped by `pk__in` alone, so a link
+    archived by someone else in the gap between expire_links' read and that UPDATE
+    was still matched by it regardless of its new status, and got flipped from
+    ARCHIVED to DISABLED -- a real change to what the link is, not just a miscount.
+    Repeating `status=Link.Status.ACTIVE` in the UPDATE's own filter means a link
+    that already moved off ACTIVE by the time it runs is simply not matched.
+
+    Simulated the same way as the racing-update test above: monkeypatching
+    QuerySet.update, at the class level, to archive the link the first time
+    anything calls .update() -- exactly the disabling update.
+    """
+    due_link = link_services.create_link(
+        membership, destination_url="https://example.com/archived-race", code="archived-race"
+    )
+    due_link.expires_at = datetime.now(tz=UTC) - timedelta(minutes=1)
+    due_link.save(update_fields=["expires_at"])
+    redirect_cache.set_payload(due_link.code, redirect_cache.payload_from_link(due_link))
+
+    original_update = QuerySet.update
+    triggered = False
+
+    def archive_then_update(self, **kwargs):
+        nonlocal triggered
+        if not triggered:
+            triggered = True
+            # The archive action, landing after `due` was already read but before
+            # the disabling update runs.
+            Link.objects.filter(pk=due_link.pk).update(status=Link.Status.ARCHIVED)
+        return original_update(self, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "update", archive_then_update)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        expire_links.enqueue()
+
+    due_link.refresh_from_db()
+    assert due_link.status == Link.Status.ARCHIVED
 
 
 # --- enqueue_scheduled --------------------------------------------------------------------

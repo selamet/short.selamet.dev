@@ -208,18 +208,35 @@ def _rebuild_daily_stats_for_day(day):
     logger.info("rebuild_daily_stats day=%s links=%d", day, len(link_ids))
 
 
-def _delete_in_batches(queryset, batch_size):
+def _delete_in_batches(queryset, batch_size, max_batches=None):
     """Delete every row `queryset` matches, `batch_size` rows at a time, so clearing
     a large backlog never holds one long-running DELETE (and its locks) for the
-    whole set. Returns the total number of rows removed."""
+    whole set. Returns the total number of rows removed.
+
+    Stops after `max_batches` batches when given, leaving whatever is left for the
+    next scheduled run instead of running unbounded against a large backlog (see
+    ANALYTICS_PURGE_MAX_BATCHES and purge_click_events below) -- the serial db_worker
+    this runs on has nothing else to record clicks or run any other scheduled job
+    while one purge call is still going.
+    """
     model = queryset.model
     total = 0
-    while True:
+    batches = 0
+    while max_batches is None or batches < max_batches:
         ids = list(queryset.order_by("pk").values_list("pk", flat=True)[:batch_size])
         if not ids:
-            break
+            return total
         deleted, _ = model.objects.filter(pk__in=ids).delete()
         total += deleted
+        batches += 1
+    if queryset.exists():
+        logger.warning(
+            "purge of %s stopped early after %d batches (ANALYTICS_PURGE_MAX_BATCHES=%d); "
+            "rows remain for the next scheduled run",
+            model.__name__,
+            batches,
+            max_batches,
+        )
     return total
 
 
@@ -227,9 +244,9 @@ def _delete_in_batches(queryset, batch_size):
 def purge_click_events():
     """Delete ClickEvent rows older than CLICK_EVENT_RETENTION_DAYS, and the
     DailyClickIdentity rows for the same cutoff date, in batches of
-    ANALYTICS_PURGE_BATCH_SIZE. DailyLinkStat and DailyLinkBreakdown are never
-    touched here: they are the entire point of keeping rollups once the raw events
-    behind them are gone.
+    ANALYTICS_PURGE_BATCH_SIZE, up to ANALYTICS_PURGE_MAX_BATCHES batches per table
+    per run. DailyLinkStat and DailyLinkBreakdown are never touched here: they are
+    the entire point of keeping rollups once the raw events behind them are gone.
 
     DailyClickIdentity carries no foreign key to ClickEvent (see its docstring in
     apps.analytics.models: it exists purely so rollups._claim_identity() has
@@ -239,11 +256,12 @@ def purge_click_events():
     """
     cutoff = timezone.now() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
     batch_size = settings.ANALYTICS_PURGE_BATCH_SIZE
+    max_batches = settings.ANALYTICS_PURGE_MAX_BATCHES
     events_deleted = _delete_in_batches(
-        ClickEvent.objects.filter(occurred_at__lt=cutoff), batch_size
+        ClickEvent.objects.filter(occurred_at__lt=cutoff), batch_size, max_batches
     )
     identities_deleted = _delete_in_batches(
-        DailyClickIdentity.objects.filter(date__lt=cutoff.date()), batch_size
+        DailyClickIdentity.objects.filter(date__lt=cutoff.date()), batch_size, max_batches
     )
     logger.info(
         "purge_click_events cutoff=%s events=%d identities=%d",
@@ -289,6 +307,13 @@ def expire_links():
     are exactly the ones invalidated, every time; a link that turns eligible mid-run
     is simply left for the next run (this job runs every 10 minutes, see
     docker/crontab) rather than raced.
+
+    The UPDATE also repeats `status=Link.Status.ACTIVE`, not just `pk__in`: a link
+    archived (or otherwise moved off ACTIVE) by someone in the gap between the read
+    above and this statement must be left exactly as they left it, not flipped to
+    DISABLED underneath them. Without this, `pk__in` alone matches it regardless of
+    its current status and resurrects it from ARCHIVED to a merely-disabled state --
+    a real change to what the link is, not just a miscount.
     """
     now = timezone.now()
     with transaction.atomic():
@@ -300,6 +325,8 @@ def expire_links():
             return
         pks = [pk for pk, _code in pks_and_codes]
         codes = [code for _pk, code in pks_and_codes]
-        updated = Link.objects.filter(pk__in=pks).update(status=Link.Status.DISABLED)
+        updated = Link.objects.filter(pk__in=pks, status=Link.Status.ACTIVE).update(
+            status=Link.Status.DISABLED
+        )
     link_services.invalidate_cache(*codes)
     logger.info("expire_links disabled=%d", updated)
