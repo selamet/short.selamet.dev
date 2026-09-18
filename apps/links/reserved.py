@@ -34,5 +34,16 @@ RESERVED_CODES = frozenset(
         "link",
         "qr",
         "short",
+        "dashboard",
+        "pricing",
+        "blog",
+        "docs",
+        "app",
+        "assets",
+        "signin",
+        "register",
+        "account",
+        "billing",
+        "contact",
     }
 )

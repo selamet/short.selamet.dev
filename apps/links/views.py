@@ -230,8 +230,9 @@ def link_list(request, slug):
         .order_by("-created_at")
     )
     status = request.GET.get("status", Link.Status.ACTIVE)
-    if status in Link.Status.values:
-        query = query.filter(status=status)
+    if status not in Link.Status.values:
+        status = Link.Status.ACTIVE
+    query = query.filter(status=status)
     tag = request.GET.get("tag", "")
     if tag:
         query = query.filter(tags__name__iexact=tag)

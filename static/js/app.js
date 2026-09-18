@@ -41,19 +41,46 @@
     }
   });
 
+  // The element focus returns to once the confirm dialog closes: whatever had focus
+  // right before it opened (normally the button that triggered it).
+  let modalTrigger = null;
+
   function closeModal() {
     const modal = document.getElementById("modal");
-    if (modal) modal.innerHTML = "";
+    if (!modal) return;
+    modal.innerHTML = "";
+    if (modalTrigger && document.contains(modalTrigger)) modalTrigger.focus();
+    modalTrigger = null;
   }
 
   document.addEventListener("click", (event) => {
     if (event.target.closest("[data-modal-close]")) closeModal();
   });
 
+  document.addEventListener("keydown", (event) => {
+    const modal = document.getElementById("modal");
+    if (event.key === "Escape" && modal && modal.firstElementChild) closeModal();
+  });
+
   document.addEventListener("htmx:afterSwap", (event) => {
     const modal = document.getElementById("modal");
     const target = event.detail.target;
-    if (modal && target && !modal.contains(target)) closeModal();
+    if (!modal) return;
+    if (target === modal) {
+      // The confirm dialog was just swapped into the modal host: remember what
+      // triggered it and move focus into the dialog.
+      modalTrigger = document.activeElement;
+      if (modal.firstElementChild) modal.firstElementChild.focus();
+      return;
+    }
+    if (modal.firstElementChild && !modal.contains(target)) closeModal();
+  });
+
+  // A full-page (non-htmx) re-render with form errors moves focus to the error
+  // summary, so a screen reader and keyboard user land on it immediately.
+  document.addEventListener("DOMContentLoaded", () => {
+    const errorSummary = document.getElementById("form-errors");
+    if (errorSummary) errorSummary.focus();
   });
 
   window.short = { toast, setTheme: (value) => root.setAttribute("data-theme", value) };

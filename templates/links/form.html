@@ -4,7 +4,7 @@
 <h1 class="text-[20px] font-semibold">{% if link %}Edit link{% else %}New link{% endif %}</h1>
 
 {% if form.errors %}
-<div class="mt-4 rounded-md border border-danger px-4 py-3" role="alert">
+<div id="form-errors" class="mt-4 rounded-md border border-danger px-4 py-3" role="alert" tabindex="-1">
   <p class="font-medium text-danger">Please fix the following:</p>
   <ul class="mt-1 list-disc pl-5 text-danger">
     {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}

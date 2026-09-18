@@ -64,6 +64,14 @@ def test_list_filters_by_status_tag_and_search(member_client, links):
     assert "spring-drop" in searched and "tt-sale24" not in searched
 
 
+def test_list_falls_back_to_active_for_an_unknown_status(member_client, links):
+    response = member_client.get(url("list") + "?status=bogus")
+    body = response.content.decode()
+    assert "spring-drop" in body and "tt-sale24" in body
+    assert "nl-jul" not in body
+    assert 'value="active" selected' in body
+
+
 def test_list_htmx_request_returns_rows_only(member_client, links):
     response = member_client.get(url("list") + "?q=spring", HTTP_HX_REQUEST="true")
     body = response.content.decode()

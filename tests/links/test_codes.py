@@ -34,3 +34,24 @@ def test_validate_code_rejects_bad_values(code):
 @pytest.mark.parametrize("code", ["spring-drop", "k3f9xa", "nl_jul", "abc"])
 def test_validate_code_accepts_good_values(code):
     assert codes.validate_code(code) == code
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "dashboard",
+        "pricing",
+        "blog",
+        "docs",
+        "app",
+        "assets",
+        "signin",
+        "register",
+        "account",
+        "billing",
+        "contact",
+    ],
+)
+def test_validate_code_rejects_the_extended_reserved_words(code):
+    with pytest.raises(ValidationError):
+        codes.validate_code(code)

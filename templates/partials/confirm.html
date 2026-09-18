@@ -1,8 +1,8 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-sm rounded-lg border border-line bg-surface p-6">
+  <div class="w-full max-w-sm rounded-lg border border-line bg-surface p-6" role="dialog" aria-modal="true" tabindex="-1">
     <h2 class="text-[15px] font-semibold">{{ title }}</h2>
     <p class="mt-2 text-ink-muted">{{ body }}</p>
-    <form method="post" hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="outerHTML" class="mt-4 flex justify-end gap-3">
+    <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="outerHTML" class="mt-4 flex justify-end gap-3">
       {% csrf_token %}
       <button type="button" data-modal-close class="rounded-md border border-line px-4 py-2 font-medium hover:bg-surface-2">Cancel</button>
       <button type="submit" class="rounded-md bg-danger px-4 py-2 font-semibold text-white">{{ confirm_label|default:"Confirm" }}</button>
