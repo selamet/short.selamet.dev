@@ -1,0 +1,7 @@
+{% extends "redirects/_base.html" %}
+{% block title %}Temporarily unavailable · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-warn" aria-hidden="true">503</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">Temporarily unavailable</h1>
+<p class="mt-2 text-ink-muted">Something is wrong on our side. Try again in a moment.</p>
+{% endblock %}

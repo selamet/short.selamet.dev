@@ -66,6 +66,16 @@ LINK_METADATA_RATE_PER_WORKSPACE = env.int("LINK_METADATA_RATE_PER_WORKSPACE", d
 LINK_METADATA_RATE_PER_WORKSPACE_WINDOW = env.int(
     "LINK_METADATA_RATE_PER_WORKSPACE_WINDOW", default=60
 )
+REDIRECT_CACHE_TTL = env.int("REDIRECT_CACHE_TTL", default=3600)
+REDIRECT_MISS_TTL = env.int("REDIRECT_MISS_TTL", default=60)
+# Per-IP rate limit on the redirect path, enforced in apps.redirects.middleware before
+# a code is resolved.
+REDIRECT_RATE_PER_IP = env.int("REDIRECT_RATE_PER_IP", default=20)
+REDIRECT_RATE_PER_IP_WINDOW = env.int("REDIRECT_RATE_PER_IP_WINDOW", default=1)
+DEEP_LINK_FALLBACK_MS = env.int("DEEP_LINK_FALLBACK_MS", default=1500)
+# How long ClickEvent rows are kept before the retention purge task (owned by the
+# analytics issue) deletes them.
+CLICK_EVENT_RETENTION_DAYS = env.int("CLICK_EVENT_RETENTION_DAYS", default=90)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -87,13 +97,24 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # CSP has to run before RedirectMiddleware: its process_request is what makes the
+    # nonce a rendered redirect page uses available, and since RedirectMiddleware can
+    # return a response without ever calling further down the chain, CSP's
+    # process_response is the only place that response still passes through on its way
+    # out, which is what actually attaches the Content-Security-Policy header. It does
+    # no session, database or authentication work, so the hot path stays as cheap as
+    # the constraint intends.
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
+    # Ordering is the point: short-code paths are claimed here, before session, CSRF,
+    # authentication or messages middleware ever run, so a click never pays for any of
+    # that work.
+    "apps.redirects.middleware.RedirectMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

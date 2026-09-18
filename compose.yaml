@@ -19,7 +19,15 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       TASKS_BACKEND: django_tasks_db.backend.DatabaseBackend
-    command: ["python", "manage.py", "db_worker"]
+    # django-tasks-db never prunes its own result rows, so a small loop runs the
+    # prune command once a day alongside the worker, in the same container, without
+    # pulling in a scheduler (there is none in this stack) for a single periodic job.
+    command:
+      - sh
+      - -c
+      - |
+        (while true; do sleep 86400; python manage.py prune_db_task_results; done) &
+        exec python manage.py db_worker
     volumes:
       - media:/data/media
     depends_on:

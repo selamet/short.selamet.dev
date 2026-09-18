@@ -1,0 +1,32 @@
+{% extends "redirects/_base.html" %}
+{% block title %}Opening {{ SITE_NAME }}…{% endblock %}
+{% block content %}
+<p class="mono text-accent" aria-hidden="true">»</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">Opening the app…</h1>
+<p class="mt-2 text-ink-muted">If nothing happens, continue in your browser instead.</p>
+<a href="{{ resolution.fallback_url|default:resolution.url }}" rel="noopener"
+   class="mt-6 inline-block rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">
+  Continue in browser
+</a>
+{% endblock %}
+{% block scripts %}
+{{ resolution.app_url|json_script:"deep-link-app-url" }}
+{{ resolution.fallback_url|default:resolution.url|json_script:"deep-link-fallback-url" }}
+{{ fallback_ms|json_script:"deep-link-fallback-ms" }}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  var appUrl = JSON.parse(document.getElementById("deep-link-app-url").textContent);
+  var fallbackUrl = JSON.parse(document.getElementById("deep-link-fallback-url").textContent);
+  var fallbackMs = JSON.parse(document.getElementById("deep-link-fallback-ms").textContent);
+  window.location.href = appUrl;
+  window.setTimeout(function () {
+    // A visitor should never be sent to an empty location: the link service refuses
+    // to store an app scheme without a web fallback, but the page does not rely on
+    // that — it always has resolution.url (the destination) as a last resort.
+    if (fallbackUrl) {
+      window.location.href = fallbackUrl;
+    }
+  }, fallbackMs);
+})();
+</script>
+{% endblock %}

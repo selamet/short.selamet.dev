@@ -48,6 +48,27 @@ def short_url(link):
     return f"{settings.SITE_URL.rstrip('/')}/{link.code}"
 
 
+def _invalidate_on_commit(*codes):
+    """Clear the redirect cache for one or more codes once the current transaction
+    actually commits, so a write that later rolls back never clears a good entry.
+
+    The redirect cache is imported lazily, inside the callback, to keep the app
+    dependency one-directional: apps.redirects already imports from apps.links, so a
+    module-level import here would be circular.
+    """
+    unique_codes = {code for code in codes if code}
+    if not unique_codes:
+        return
+
+    def _invalidate():
+        from apps.redirects import cache as redirect_cache
+
+        for code in unique_codes:
+            redirect_cache.invalidate(code)
+
+    transaction.on_commit(_invalidate)
+
+
 def code_available(code, exclude=None):
     code = code_utils.normalize_code(code)
     query = Link.objects.filter(code=code)
@@ -87,6 +108,7 @@ def set_tags(actor, link, names):
             tag = Tag.objects.get(workspace=link.workspace, name__iexact=name)
         tags.append(tag)
     link.tags.set(tags)
+    _invalidate_on_commit(link.code)
     return tags
 
 
@@ -118,6 +140,7 @@ def set_targets(actor, link, rows):
     with transaction.atomic():
         link.targets.all().delete()
         LinkTarget.objects.bulk_create([LinkTarget(link=link, **row) for row in cleaned])
+    _invalidate_on_commit(link.code)
     return cleaned
 
 
@@ -167,6 +190,12 @@ def create_link(actor, destination_url, code="", tags=None, targets=None, **fiel
                 set_targets(actor, link, targets)
     except IntegrityError as error:
         raise ValidationError("That code is already taken.") from error
+    # Synchronous, not deferred to commit: this only ever clears a negative cache entry
+    # (or nothing), so a code that was probed a moment ago starts working immediately,
+    # and there is no "good entry" a later rollback could be protecting.
+    from apps.redirects import cache as redirect_cache
+
+    redirect_cache.invalidate(code)
     logger.info(
         "link.create workspace=%s actor=%s code=%s", link.workspace_id, actor.user_id, link.code
     )
@@ -181,6 +210,7 @@ def create_link(actor, destination_url, code="", tags=None, targets=None, **fiel
 def update_link(actor, link, destination_url=None, code=None, tags=None, targets=None, **fields):
     _require_manage(actor)
     _require_same_workspace(actor, link)
+    old_code = link.code
     changed = []
     # Snapshot of what a fetch (or an earlier override) last stored, taken before the
     # loop below overwrites it, so an edit form that simply re-submits the same values
@@ -231,6 +261,10 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
                 set_targets(actor, link, targets)
     except IntegrityError as error:
         raise ValidationError("That code is already taken.") from error
+    # The old code always needs invalidating (any field may have changed the cached
+    # payload); the new one only matters when the code itself changed, but passing both
+    # is harmless since _invalidate_on_commit dedupes.
+    _invalidate_on_commit(old_code, link.code)
     logger.info(
         "link.update workspace=%s actor=%s code=%s", link.workspace_id, actor.user_id, link.code
     )
@@ -255,6 +289,7 @@ def _set_status(actor, link, status, event):
         raise InvalidOperation("Too many changes. Slow down for a moment.")
     link.status = status
     link.save(update_fields=["status"])
+    _invalidate_on_commit(link.code)
     logger.info(
         "%s workspace=%s actor=%s code=%s", event, link.workspace_id, actor.user_id, link.code
     )

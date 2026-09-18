@@ -79,7 +79,7 @@ Rules:
 - `ApiKey`: `workspace`, `name`, `prefix` (first 8 chars, shown in lists), `key_hash`, `last_used_at`, `revoked_at`, `created_by`, `created_at`.
 
 ### links
-- `Link`: `workspace`, `code` (unique; 7-char base62 by default or custom slug), `destination_url`, `title`, `favicon_url`, `note`, `status` ∈ {active, disabled, archived}, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `og_title`, `og_description`, `og_image` (file or URL), `og_fetched_at`, `expires_at`, `max_clicks`, `click_count` (denormalized, updated by task), `created_by`, `created_at`, `updated_at`.
+- `Link`: `workspace`, `code` (unique; 7-char base62 by default or custom slug), `destination_url`, `title`, `favicon_url`, `note`, `status` ∈ {active, disabled, archived}, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `og_title`, `og_description`, `og_image` (file or URL), `og_fetched_at`, `expires_at`, `max_clicks` (a soft cap: the redirect path checks it against a click counter that lags the redirect by design, so a burst of concurrent clicks can land slightly over it), `click_count` (denormalized, updated by task), `created_by`, `created_at`, `updated_at`.
 - `LinkTarget`: `link`, `platform` ∈ {ios, android, desktop}, `url`, `app_url` (deep link, optional), `fallback_url`; unique (link, platform). No rows when device routing is off.
 - `Tag`: `workspace`, `name`, `color`; unique (workspace, name). `Link.tags` M2M.
 - `ImportJob`: `workspace`, `file`, `status`, `total_rows`, `processed_rows`, `errors` (JSON), `created_by`, timestamps.
@@ -101,7 +101,7 @@ Unique click definition: same `ip_hash` + `user_agent` for the same link within 
 4. Target selection: detect platform from the user agent (ios/android/desktop). Use the matching `LinkTarget.url` if present, otherwise `destination_url`. Append stored UTM parameters without overriding parameters already present on the destination.
 5. If the selected target has `app_url`, return a small `noindex` HTML page that attempts the deep link and falls back to `fallback_url` after 1.5 s.
 6. Expiry (`expires_at`, `max_clicks`) is checked against cached values; expired links render the "link expired" page.
-7. Enqueue `record_click(link_id, occurred_at, ip, user_agent, referrer, query_string, target_platform)`. This call never blocks the redirect.
+7. Enqueue `record_click(link_id, occurred_at, ip_hash, user_agent, referrer_host, referrer_url, utm_source, utm_medium, utm_campaign, utm_content, utm_term, target_platform)` — the view hashes the IP and splits the referrer/query string before enqueuing, so the task never receives a raw address, credentials or an unbounded query string. This call never blocks the redirect, but it is not free: in production the task backend is a database table, so enqueuing is a synchronous INSERT inside the request — the one write this path makes, accepted because a real task queue is not part of this project.
 8. Return `302 Found` (never 301, so every click is measured).
 
 Social crawlers (facebookexternalhit, Twitterbot, WhatsApp, Slackbot, LinkedInBot, TelegramBot, Discordbot) receive an HTML page containing only the OG meta tags instead of a redirect. These requests are not counted as clicks. Other bot detection happens in the task, not the view.

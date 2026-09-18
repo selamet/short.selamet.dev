@@ -1,0 +1,169 @@
+import pytest
+from django.utils import timezone
+
+from apps.analytics import attribution
+from apps.analytics.models import ClickEvent
+from apps.analytics.tasks import record_click
+from apps.core.privacy import hash_ip
+from apps.links.models import Link
+from apps.redirects import cache as redirect_cache
+from tests.redirects.conftest import DESKTOP_UA, IOS_UA
+
+# The redirect view hashes the visitor's address before enqueuing the task (see
+# apps/redirects/views.py::_record), so record_click never sees a raw address. This
+# stands in for that already-hashed value.
+IP_HASH = hash_ip("203.0.113.9")
+
+
+def _record(
+    link,
+    referrer="https://www.instagram.com/acme/",
+    query_string="utm_source=instagram&utm_medium=bio",
+    **overrides,
+):
+    """Builds the kwargs record_click actually receives: the view splits the raw
+    referrer and query string before enqueuing (see apps.analytics.attribution), so
+    tests do the same split here rather than passing raw values the task no longer
+    accepts."""
+    referrer_host, referrer_url = attribution.split_referrer(referrer)
+    payload = {
+        "occurred_at": timezone.now().isoformat(),
+        "ip_hash": IP_HASH,
+        "user_agent": DESKTOP_UA,
+        "referrer_host": referrer_host,
+        "referrer_url": referrer_url,
+        "target_platform": "desktop",
+        **attribution.utm_from_query_string(query_string),
+    }
+    payload.update(overrides)
+    record_click.enqueue(link.pk, **payload)
+
+
+@pytest.mark.django_db
+def test_record_click_writes_an_event_and_increments_the_counter(link):
+    _record(link)
+    event = ClickEvent.objects.get()
+    assert event.link_id == link.pk
+    assert event.workspace_id == link.workspace_id
+    assert event.target_platform == "desktop"
+    assert event.device_type == "desktop"
+    # DESKTOP_UA carries no recognizable browser token; browser() and
+    # operating_system() agree that "unknown" is "", not a made-up label.
+    assert event.browser == ""
+    assert event.referrer_host == "www.instagram.com"
+    assert event.utm_source == "instagram"
+    assert event.is_bot is False
+    link.refresh_from_db()
+    assert link.click_count == 1
+
+
+@pytest.mark.django_db
+def test_the_ip_hash_is_stored_as_given_and_never_re_hashed(link):
+    # record_click receives an already-hashed value from the view; it must persist it
+    # unchanged rather than hashing it a second time.
+    _record(link)
+    event = ClickEvent.objects.get()
+    assert event.ip_hash == IP_HASH
+    assert len(event.ip_hash) == 64
+
+
+@pytest.mark.django_db
+def test_the_referrer_query_string_is_dropped(link):
+    _record(link, referrer="https://www.instagram.com/acme/?secret=token")
+    event = ClickEvent.objects.get()
+    assert "secret" not in event.referrer_url
+    assert event.referrer_host == "www.instagram.com"
+
+
+@pytest.mark.django_db
+def test_referrer_credentials_are_stripped(link):
+    _record(link, referrer="https://user:secret@example.com/p?t=1#frag")
+    event = ClickEvent.objects.get()
+    assert event.referrer_host == "example.com"
+    assert "user" not in event.referrer_url
+    assert "secret" not in event.referrer_url
+    assert "t=1" not in event.referrer_url
+    assert "frag" not in event.referrer_url
+
+
+@pytest.mark.django_db
+def test_overlong_values_are_truncated_not_dropped(link):
+    long_host = "x" * 300 + ".example.com"
+    long_campaign = "y" * 500
+    _record(
+        link,
+        referrer=f"https://{long_host}/p",
+        query_string=f"utm_campaign={long_campaign}",
+    )
+    event = ClickEvent.objects.get()
+    assert len(event.referrer_host) == ClickEvent._meta.get_field("referrer_host").max_length
+    assert len(event.utm_campaign) == ClickEvent._meta.get_field("utm_campaign").max_length
+    assert event.referrer_host == long_host[: len(event.referrer_host)]
+    assert event.utm_campaign == long_campaign[: len(event.utm_campaign)]
+    link.refresh_from_db()
+    assert link.click_count == 1
+
+
+@pytest.mark.django_db
+def test_a_bot_user_agent_is_flagged_but_still_recorded(link):
+    _record(link, user_agent="Googlebot/2.1 (+http://www.google.com/bot.html)")
+    event = ClickEvent.objects.get()
+    assert event.is_bot is True
+    link.refresh_from_db()
+    assert link.click_count == 1
+
+
+@pytest.mark.django_db
+def test_platform_fields_come_from_the_user_agent(link):
+    _record(link, user_agent=IOS_UA, target_platform="ios")
+    event = ClickEvent.objects.get()
+    assert event.device_type == "mobile"
+    assert event.os == "iOS"
+
+
+@pytest.mark.django_db
+def test_recording_bumps_the_click_count_in_its_own_cache_key(link):
+    from apps.redirects import resolver
+
+    resolver.resolve(link.code, DESKTOP_UA)
+    _record(link)
+    # The counter lives outside the cached payload entirely now (see I2): the payload
+    # snapshot from before this click is untouched, and the counter is what moved.
+    assert redirect_cache.get_payload(link.code)["click_count"] == 0
+    assert redirect_cache.get_click_count(link.code) == 1
+
+
+@pytest.mark.django_db
+def test_a_failure_updating_the_counter_rolls_back_the_event_too(link, monkeypatch):
+    # The immediate task backend used in tests logs a task failure rather than
+    # propagating it to the caller, so this asserts on the resulting database state
+    # instead of an exception: without transaction.atomic() around the write, the
+    # ClickEvent below would survive even though the counter update after it failed.
+    from apps.analytics import tasks as analytics_tasks
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(analytics_tasks, "F", boom)
+    _record(link)
+    assert ClickEvent.objects.count() == 0
+    link.refresh_from_db()
+    assert link.click_count == 0
+
+
+@pytest.mark.django_db
+def test_a_deleted_link_is_skipped_quietly(link, caplog):
+    link_id = link.pk
+    Link.objects.filter(pk=link_id).delete()
+    record_click.enqueue(
+        link_id,
+        occurred_at=timezone.now().isoformat(),
+        ip_hash="",
+        user_agent="",
+        referrer_host="",
+        referrer_url="",
+        target_platform="desktop",
+        **attribution.utm_from_query_string(""),
+    )
+    assert ClickEvent.objects.count() == 0
+    assert "no longer exists" in caplog.text

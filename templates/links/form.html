@@ -49,6 +49,7 @@
         <button type="button" id="randomize-code" class="rounded-md border border-line px-3 py-2 font-medium hover:bg-surface-2">Randomize</button>
       </div>
       <span id="code-check" class="text-[11.5px]">{% if form.code.errors %}<span class="text-danger" role="alert">{{ form.code.errors.0 }}</span>{% endif %}</span>
+      {% if link %}<a href="{{ link.short_url }}+" target="_blank" rel="noopener" class="text-[11.5px] text-ink-muted underline">preview</a>{% endif %}
     </label>
   </section>
 
