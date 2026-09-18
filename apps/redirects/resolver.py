@@ -22,6 +22,25 @@ logger = logging.getLogger(__name__)
 # negative cache than a real link, so its miss is not worth remembering.
 PLAUSIBLE_CUSTOM_CODE_MAX_LENGTH = 20
 
+# The top-level keys payload_from_link always sets. A cached value missing any of
+# these, or that is not even a dict (a stale shape from before a CACHE_VERSION bump
+# that somehow survived, a string, a list, whatever), is treated as a miss rather than
+# indexed into blindly, so a payload shape change is never an unhandled exception on
+# the hot path.
+EXPECTED_PAYLOAD_KEYS = frozenset(
+    {
+        "id",
+        "status",
+        "destination_url",
+        "expires_at",
+        "max_clicks",
+        "click_count",
+        "utm",
+        "og",
+        "targets",
+    }
+)
+
 
 @dataclass
 class Resolution:
@@ -53,12 +72,18 @@ def _looks_worth_caching_as_a_miss(code):
     return len(code) <= PLAUSIBLE_CUSTOM_CODE_MAX_LENGTH
 
 
+def _has_expected_shape(payload):
+    return isinstance(payload, dict) and EXPECTED_PAYLOAD_KEYS.issubset(payload)
+
+
 def _payload_for(code):
     cached = redirect_cache.get_payload(code)
     if cached == redirect_cache.MISS:
         return None
     if cached is not None:
-        return cached
+        if _has_expected_shape(cached):
+            return cached
+        logger.warning("cached payload for %s had an unexpected shape; reloading", code)
     link = Link.objects.filter(code=code).prefetch_related("targets").first()
     if link is None:
         if _looks_worth_caching_as_a_miss(code):
@@ -70,19 +95,28 @@ def _payload_for(code):
 
 
 def _is_expired(payload):
+    # A malformed expires_at (wrong type, unparsable string) or a naive one (no
+    # timezone, which makes the comparison below raise TypeError under USE_TZ) is
+    # treated as not expired rather than raising: whatever produced it, that is not
+    # grounds to block a redirect that would otherwise work.
     expires_at = payload.get("expires_at")
-    if expires_at and datetime.fromisoformat(expires_at) <= timezone.now():
-        return True
+    if expires_at:
+        try:
+            if datetime.fromisoformat(expires_at) <= timezone.now():
+                return True
+        except (TypeError, ValueError):
+            pass
     max_clicks = payload.get("max_clicks")
     return bool(max_clicks and payload.get("click_count", 0) >= max_clicks)
 
 
 def choose_target(payload, platform):
     """The row for this platform, or the link's own destination."""
-    target = payload["targets"].get(platform)
-    if target and (target["url"] or target["app_url"]):
+    targets = payload.get("targets") or {}
+    target = targets.get(platform)
+    if target and (target.get("url") or target.get("app_url")):
         return target
-    return {"url": payload["destination_url"], "app_url": "", "fallback_url": ""}
+    return {"url": payload.get("destination_url", ""), "app_url": "", "fallback_url": ""}
 
 
 def resolve(code, user_agent):
@@ -94,19 +128,18 @@ def resolve(code, user_agent):
         return None
     platform = platforms.detect_platform(user_agent)
     target = choose_target(payload, platform)
-    base_url = target["url"] or target["fallback_url"] or payload["destination_url"]
-    fallback_url = (
-        utm_utils.merge_utm(target["fallback_url"], payload["utm"])
-        if target["fallback_url"]
-        else ""
-    )
+    utm = payload.get("utm") or {}
+    destination_url = payload.get("destination_url", "")
+    base_url = target.get("url") or target.get("fallback_url") or destination_url
+    target_fallback_url = target.get("fallback_url")
+    fallback_url = utm_utils.merge_utm(target_fallback_url, utm) if target_fallback_url else ""
     return Resolution(
-        link_id=payload["id"],
-        status=payload["status"],
-        url=utm_utils.merge_utm(base_url, payload["utm"]),
+        link_id=payload.get("id"),
+        status=payload.get("status", Link.Status.DISABLED),
+        url=utm_utils.merge_utm(base_url, utm),
         platform=platform,
-        app_url=target["app_url"],
+        app_url=target.get("app_url", ""),
         fallback_url=fallback_url,
         expired=_is_expired(payload),
-        og=payload["og"],
+        og=payload.get("og") or {},
     )

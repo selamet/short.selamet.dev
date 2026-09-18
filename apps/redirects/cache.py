@@ -2,7 +2,10 @@
 
 Values are plain JSON-safe dictionaries, never pickled models, so a schema change can
 never make a cached entry undeserializable. A missing code is remembered too, so a scan
-for short codes does not turn into a scan of the database.
+for short codes does not turn into a scan of the database. The key carries a version
+(CACHE_VERSION) so a payload shape change never has to reconcile old-shape values left
+over from a previous deployment; resolver._payload_for also treats an unexpected shape
+on read as a miss, as a second line of defense.
 """
 
 import logging
@@ -14,9 +17,14 @@ logger = logging.getLogger(__name__)
 
 MISS = "miss"
 
+# Bump this whenever the payload shape built by payload_from_link changes, so a
+# deployment never has to reconcile an old-shape value left over from before it: the
+# new code simply misses on the old key and rebuilds under the new one.
+CACHE_VERSION = "v1"
+
 
 def key_for(code):
-    return f"link:{code}"
+    return f"link:{CACHE_VERSION}:{code}"
 
 
 def payload_from_link(link):

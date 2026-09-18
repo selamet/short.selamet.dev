@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+import pytest
 from django.utils import timezone
 
 from apps.links import services as link_services
@@ -123,3 +124,45 @@ def test_a_long_random_code_does_not_create_a_negative_cache_entry(db):
     code = "x" * 35  # valid per CODE_RE, but far too long to be worth remembering
     assert resolver.resolve(code, DESKTOP_UA) is None
     assert redirect_cache.get_payload(code) is None
+
+
+@pytest.mark.parametrize("corrupt_payload", ["just a string", ["a", "list"]])
+def test_a_non_dict_payload_falls_back_to_the_database(link, corrupt_payload):
+    redirect_cache.set_payload(link.code, corrupt_payload)
+    resolution = resolver.resolve(link.code, DESKTOP_UA)
+    assert resolution.url == link.destination_url
+    # The bad value is replaced by a fresh, well-shaped one.
+    assert redirect_cache.get_payload(link.code) != corrupt_payload
+
+
+def test_a_payload_missing_og_falls_back_to_the_database(link):
+    payload = redirect_cache.payload_from_link(link)
+    del payload["og"]
+    redirect_cache.set_payload(link.code, payload)
+    resolution = resolver.resolve(link.code, DESKTOP_UA)
+    assert resolution.url == link.destination_url
+    assert "og" in redirect_cache.get_payload(link.code)
+
+
+def test_a_payload_missing_targets_falls_back_to_the_database(link):
+    payload = redirect_cache.payload_from_link(link)
+    del payload["targets"]
+    redirect_cache.set_payload(link.code, payload)
+    resolution = resolver.resolve(link.code, DESKTOP_UA)
+    assert resolution.url == link.destination_url
+    assert "targets" in redirect_cache.get_payload(link.code)
+
+
+def test_a_bad_expires_at_is_treated_as_not_expired(link):
+    payload = redirect_cache.payload_from_link(link)
+    payload["expires_at"] = "not-a-date"
+    redirect_cache.set_payload(link.code, payload)
+    assert resolver.resolve(link.code, DESKTOP_UA).expired is False
+
+
+def test_a_naive_expires_at_is_treated_as_not_expired(link):
+    payload = redirect_cache.payload_from_link(link)
+    # No timezone, unlike the isoformat() output payload_from_link normally stores.
+    payload["expires_at"] = "2020-01-01T00:00:00"
+    redirect_cache.set_payload(link.code, payload)
+    assert resolver.resolve(link.code, DESKTOP_UA).expired is False
