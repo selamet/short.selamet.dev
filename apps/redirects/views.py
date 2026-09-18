@@ -60,12 +60,12 @@ def redirect_view(request, code):
         return response
     if resolution is None:
         return _error_page(request, "redirects/errors/not_found.html", 404)
-    if platforms.is_crawler(user_agent):
-        return _no_store(render(request, "redirects/crawler_card.html", {"resolution": resolution}))
     if resolution.status != Link.Status.ACTIVE:
         return _error_page(request, "redirects/errors/disabled.html", 403)
     if resolution.expired:
         return _error_page(request, "redirects/errors/expired.html", 410)
+    if platforms.is_crawler(user_agent):
+        return _no_store(render(request, "redirects/crawler_card.html", {"resolution": resolution}))
     _record(request, resolution)
     if resolution.app_url:
         return _no_store(
@@ -82,6 +82,10 @@ def preview(request, code):
     resolution = resolver.resolve(code, request.META.get("HTTP_USER_AGENT", ""))
     if resolution is None:
         return _error_page(request, "redirects/errors/not_found.html", 404)
+    if resolution.status != Link.Status.ACTIVE:
+        return _error_page(request, "redirects/errors/disabled.html", 403)
+    if resolution.expired:
+        return _error_page(request, "redirects/errors/expired.html", 410)
     return _no_store(
         render(request, "redirects/preview.html", {"resolution": resolution, "code": code})
     )

@@ -142,6 +142,27 @@ def test_crawlers_get_a_card_and_no_redirect(membership):
 
 
 @pytest.mark.django_db
+def test_crawler_gets_the_disabled_page_for_an_archived_link(membership, link):
+    link_services.archive_link(membership, link)
+    response = client_get(link.code, CRAWLER_UA)
+    assert response.status_code == 403
+    assert link.destination_url not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_crawler_gets_the_expired_page_for_an_expired_link(membership):
+    link = link_services.create_link(
+        membership,
+        destination_url="https://example.com/a",
+        code="old-one",
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    response = client_get(link.code, CRAWLER_UA)
+    assert response.status_code == 410
+    assert link.destination_url not in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_crawlers_do_not_record_a_click(membership, link, monkeypatch):
     calls = []
     monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
@@ -210,3 +231,24 @@ def test_preview_page_shows_where_the_link_goes(link):
     assert "example.com" in body
     assert "noindex" in body
     assert link.code in body
+
+
+@pytest.mark.django_db
+def test_preview_page_of_an_archived_link_shows_the_disabled_page(membership, link):
+    link_services.archive_link(membership, link)
+    response = Client().get(f"/{link.code}+")
+    assert response.status_code == 403
+    assert link.destination_url not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_preview_page_of_an_expired_link_shows_the_expired_page(membership):
+    link = link_services.create_link(
+        membership,
+        destination_url="https://example.com/a",
+        code="old-one",
+        expires_at=timezone.now() - timedelta(seconds=1),
+    )
+    response = Client().get(f"/{link.code}+")
+    assert response.status_code == 410
+    assert link.destination_url not in response.content.decode()
