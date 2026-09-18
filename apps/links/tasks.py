@@ -3,7 +3,7 @@
 import logging
 import time
 from html.parser import HTMLParser
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 from django.conf import settings
@@ -46,19 +46,38 @@ class _MetadataParser(HTMLParser):
             self.title = data.strip()
 
 
-def _open_stream(client, url):
+def _open_stream(client, url, *, headers=None, extensions=None):
     """Thin seam over httpx.Client.stream so tests can fake responses without a socket."""
-    return client.stream("GET", url)
+    return client.stream("GET", url, headers=headers, extensions=extensions)
+
+
+def _pin_address(url):
+    """Resolve the validated URL's host once and rebuild the request against the
+    resolved address, so a second DNS answer (e.g. a short-TTL record flipping between
+    validation and the actual connection) cannot re-point the request at a different,
+    unvalidated address. The original host still travels as the Host header and as the
+    `sni_hostname` extension, so the server gets the name it expects and TLS still
+    verifies against it.
+    """
+    parts = urlsplit(url)
+    original_host = parts.hostname
+    address = destinations.resolve_host(original_host, settings.LINK_METADATA_DNS_TIMEOUT)[0]
+    pinned_host = f"[{address}]" if ":" in address else address
+    netloc = pinned_host if parts.port is None else f"{pinned_host}:{parts.port}"
+    pinned_url = urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
+    return pinned_url, {"Host": parts.netloc}, {"sni_hostname": original_host}
 
 
 def _fetch_html(url):
     """Download the destination, validating every redirect hop and capping size, time
-    and hop count.
+    and hop count. Returns `(html, final_url)`; `final_url` is used to resolve any
+    relative favicon/og:image found in the page.
 
     httpx's own `follow_redirects=True` only validates the URL it is given and the one
     it lands on, so a destination could redirect through an internal address in between.
     Redirects are therefore followed by hand, re-validating (including DNS) before each
-    hop is requested.
+    hop is requested, and the actual connection is pinned to the address that
+    validation just resolved (see `_pin_address`).
     """
     deadline = time.monotonic() + settings.LINK_METADATA_TOTAL_TIMEOUT
     current_url = destinations.validate_destination(url, check_dns=True)
@@ -71,7 +90,9 @@ def _fetch_html(url):
         for _ in range(settings.LINK_METADATA_MAX_REDIRECTS + 1):
             if time.monotonic() > deadline:
                 raise TimeoutError("metadata fetch exceeded its deadline")
-            with _open_stream(client, current_url) as response:
+            pinned_url, headers, extensions = _pin_address(current_url)
+            stream = _open_stream(client, pinned_url, headers=headers, extensions=extensions)
+            with stream as response:
                 if response.is_redirect:
                     location = response.headers.get("location", "")
                     next_url = urljoin(current_url, location)
@@ -79,7 +100,7 @@ def _fetch_html(url):
                     continue
                 response.raise_for_status()
                 if "html" not in response.headers.get("content-type", ""):
-                    return ""
+                    return "", current_url
                 chunks, size = [], 0
                 for chunk in response.iter_bytes():
                     if time.monotonic() > deadline:
@@ -88,7 +109,7 @@ def _fetch_html(url):
                     if size > settings.LINK_METADATA_MAX_BYTES:
                         break
                     chunks.append(chunk)
-                return b"".join(chunks).decode("utf-8", errors="replace")
+                return b"".join(chunks).decode("utf-8", errors="replace"), current_url
     raise RuntimeError("too many redirects")
 
 
@@ -109,18 +130,23 @@ def _safe_url(value):
 
 def extract_metadata(url):
     """Validate, fetch and parse a destination's title, favicon and Open Graph tags."""
-    html = _fetch_html(url)
+    html, final_url = _fetch_html(url)
     parser = _MetadataParser()
     parser.feed(html or "")
     og_title = parser.og.get("og:title", "")
     title = og_title or parser.title
-    favicon_url = _safe_url(urljoin(url, parser.icon)[:1024]) if parser.icon else ""
+    # A relative favicon/og:image is resolved against the URL the fetch actually
+    # landed on, not the one the fetch started at, or a redirect to another host
+    # would silently point either at the wrong site.
+    favicon_url = _safe_url(urljoin(final_url, parser.icon)[:1024]) if parser.icon else ""
+    og_image = parser.og.get("og:image", "")
+    og_image_url = _safe_url(urljoin(final_url, og_image)[:1024]) if og_image else ""
     return {
         "title": title[:200],
         "favicon_url": favicon_url,
         "og_title": og_title[:200],
         "og_description": parser.og.get("og:description", "")[:400],
-        "og_image_url": _safe_url(parser.og.get("og:image", "")[:1024]),
+        "og_image_url": og_image_url,
     }
 
 

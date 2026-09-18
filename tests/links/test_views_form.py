@@ -114,7 +114,8 @@ def test_metadata_fragment_uses_the_task_helper(member_client, monkeypatch):
         "apps.links.tasks._fetch_html",
         lambda url: (
             "<html><head><title>Hello</title>"
-            '<meta property="og:description" content="Desc"></head></html>'
+            '<meta property="og:description" content="Desc"></head></html>',
+            url,
         ),
     )
     response = member_client.post(
@@ -139,7 +140,7 @@ def test_metadata_lookup_is_rate_limited(member_client, monkeypatch, settings):
 
     def fake_fetch_html(url):
         calls.append(url)
-        return "<html><head><title>Hello</title></head></html>"
+        return "<html><head><title>Hello</title></head></html>", url
 
     monkeypatch.setattr("apps.links.tasks._fetch_html", fake_fetch_html)
     first = member_client.post(

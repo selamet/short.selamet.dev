@@ -52,6 +52,8 @@ LINK_METADATA_MAX_BYTES = env.int("LINK_METADATA_MAX_BYTES", default=2 * 1024 * 
 LINK_METADATA_TOTAL_TIMEOUT = env.float("LINK_METADATA_TOTAL_TIMEOUT", default=10.0)
 # Maximum redirect hops a metadata fetch will follow before giving up.
 LINK_METADATA_MAX_REDIRECTS = env.int("LINK_METADATA_MAX_REDIRECTS", default=3)
+# Budget for resolving a single host, counted against LINK_METADATA_TOTAL_TIMEOUT.
+LINK_METADATA_DNS_TIMEOUT = env.float("LINK_METADATA_DNS_TIMEOUT", default=2.0)
 # Metadata lookup rate limit (per user), separate from the outbound fetch limits
 # above: caps how often the dashboard may trigger a synchronous fetch at all.
 LINK_METADATA_RATE = env.int("LINK_METADATA_RATE", default=20)

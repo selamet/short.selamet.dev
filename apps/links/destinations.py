@@ -7,6 +7,8 @@ DNS can change between the two.
 import ipaddress
 import re
 import socket
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from urllib.parse import urlsplit, urlunsplit
 
 from django.conf import settings
@@ -55,18 +57,31 @@ def _is_private(address):
     )
 
 
-def resolves_to_private_address(host):
-    """True when the host is, or resolves to, an address we must not reach."""
+def resolve_host(host, timeout):
+    """Resolve `host` and return its addresses, validated against the same
+    private-address rules a literal IP goes through.
+
+    The lookup runs on a worker thread so a slow or hanging resolver cannot run past
+    `timeout`: `future.result(timeout=...)` returns (or raises) on time even though the
+    blocking `getaddrinfo` call itself cannot be cancelled. The executor is shut down
+    without waiting for that worker, since there is no portable way to cancel it — a
+    hung resolution keeps running in the background rather than making this call hang
+    too.
+    """
+    host = host.strip("[]")
+    executor = ThreadPoolExecutor(max_workers=1)
     try:
-        return _is_private(ipaddress.ip_address(host.strip("[]")))
-    except ValueError:
-        pass
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except OSError:
-        # Unresolvable today is not proof of safety, but it is not a private target either.
-        return False
-    return any(_is_private(ipaddress.ip_address(info[4][0])) for info in infos)
+        future = executor.submit(socket.getaddrinfo, host, None)
+        try:
+            infos = future.result(timeout=timeout)
+        except (FutureTimeoutError, OSError) as error:
+            raise ValidationError("Could not resolve that host.") from error
+    finally:
+        executor.shutdown(wait=False)
+    addresses = [info[4][0] for info in infos]
+    if any(_is_private(ipaddress.ip_address(address)) for address in addresses):
+        raise ValidationError("Private and local addresses cannot be used as destinations.")
+    return addresses
 
 
 def _rebuild_netloc(parts, host):
@@ -99,8 +114,8 @@ def validate_destination(url, check_dns=False):
             raise ValidationError("Private and local addresses cannot be used as destinations.")
     except ValueError:
         pass
-    if check_dns and resolves_to_private_address(host):
-        raise ValidationError("Private and local addresses cannot be used as destinations.")
+    if check_dns:
+        resolve_host(host, settings.LINK_METADATA_DNS_TIMEOUT)
     netloc = _rebuild_netloc(parts, host)
     return urlunsplit((parts.scheme.lower(), netloc, parts.path, parts.query, parts.fragment))
 

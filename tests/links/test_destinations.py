@@ -1,7 +1,12 @@
+import socket
+import time
+
 import pytest
 from django.core.exceptions import ValidationError
 
 from apps.links import destinations
+
+FAKE_PUBLIC_ADDRESS = "93.184.216.34"
 
 
 @pytest.mark.parametrize(
@@ -67,6 +72,37 @@ def test_is_blocked_host_matches_across_unicode_and_punycode(settings):
     assert destinations.is_blocked_host("xn--caf-dma.example") is True
     settings.BLOCKED_LINK_DOMAINS = ["xn--caf-dma.example"]
     assert destinations.is_blocked_host("café.example") is True
+
+
+def test_resolve_host_raises_when_resolution_is_slower_than_its_timeout(monkeypatch):
+    def slow_getaddrinfo(host, port):
+        time.sleep(0.3)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (FAKE_PUBLIC_ADDRESS, 0))]
+
+    monkeypatch.setattr(destinations.socket, "getaddrinfo", slow_getaddrinfo)
+    start = time.monotonic()
+    with pytest.raises(ValidationError):
+        destinations.resolve_host("example.com", 0.05)
+    assert time.monotonic() - start < 0.3
+
+
+def test_resolve_host_rejects_a_private_address(monkeypatch):
+    monkeypatch.setattr(
+        destinations.socket,
+        "getaddrinfo",
+        lambda host, port: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))],
+    )
+    with pytest.raises(ValidationError):
+        destinations.resolve_host("example.com", 1.0)
+
+
+def test_resolve_host_returns_the_resolved_addresses(monkeypatch):
+    monkeypatch.setattr(
+        destinations.socket,
+        "getaddrinfo",
+        lambda host, port: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (FAKE_PUBLIC_ADDRESS, 0))],
+    )
+    assert destinations.resolve_host("example.com", 1.0) == [FAKE_PUBLIC_ADDRESS]
 
 
 @pytest.mark.parametrize(
