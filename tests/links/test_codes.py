@@ -11,8 +11,12 @@ def test_generated_codes_use_the_unambiguous_alphabet_and_default_length(setting
     for code in generated:
         assert len(code) == 7
         assert set(code) <= set(codes.ALPHABET)
-    for confusable in "O0Il1":
+    for confusable in "O0Il1o":
         assert confusable not in codes.ALPHABET
+
+
+def test_alphabet_has_no_uppercase():
+    assert codes.ALPHABET == codes.ALPHABET.lower()
 
 
 def test_normalize_code_strips_and_lowercases():

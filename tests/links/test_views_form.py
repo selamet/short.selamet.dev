@@ -114,6 +114,14 @@ def test_edit_404_for_another_workspace(client, other_membership, owner_membersh
     assert client.get(reverse("links:edit", args=["other", "mine"])).status_code == 404
 
 
+def test_edit_resolves_a_differently_cased_code_in_the_url(member_client, owner_membership):
+    services.create_link(
+        owner_membership, destination_url="https://example.com", code="spring-drop"
+    )
+    response = member_client.get(url("edit", "acme-social", "Spring-Drop"))
+    assert response.status_code == 200
+
+
 def test_code_check_fragment(member_client, owner_membership):
     services.create_link(owner_membership, destination_url="https://example.com", code="taken")
     taken = member_client.get(url("code_check") + "?code=taken", HTTP_HX_REQUEST="true")

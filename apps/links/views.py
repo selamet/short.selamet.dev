@@ -70,7 +70,9 @@ def create(request, slug):
 @require_role()
 @require_http_methods(["GET", "POST"])
 def edit(request, slug, code):
-    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    link = get_object_or_404(
+        Link, code=code_utils.normalize_code(code), workspace=request.workspace
+    )
     initial = {
         "destination_url": link.destination_url,
         "code": link.code,
@@ -238,7 +240,9 @@ def link_list(request, slug):
 @require_role()
 @require_GET
 def archive_confirm(request, slug, code):
-    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    link = get_object_or_404(
+        Link, code=code_utils.normalize_code(code), workspace=request.workspace
+    )
     return render(
         request,
         "partials/confirm.html",
@@ -256,7 +260,9 @@ def archive_confirm(request, slug, code):
 @require_role()
 @require_POST
 def archive(request, slug, code):
-    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    link = get_object_or_404(
+        Link, code=code_utils.normalize_code(code), workspace=request.workspace
+    )
     services.archive_link(request.membership, link)
     if request.headers.get("HX-Request"):
         return render(request, "links/partials/row.html", {"link": link})
@@ -266,7 +272,9 @@ def archive(request, slug, code):
 @require_role()
 @require_POST
 def restore(request, slug, code):
-    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    link = get_object_or_404(
+        Link, code=code_utils.normalize_code(code), workspace=request.workspace
+    )
     services.restore_link(request.membership, link)
     if request.headers.get("HX-Request"):
         return render(request, "links/partials/row.html", {"link": link})

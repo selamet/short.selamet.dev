@@ -50,7 +50,7 @@ def short_url(link):
 
 def code_available(code, exclude=None):
     code = code_utils.normalize_code(code)
-    query = Link.objects.filter(code__iexact=code)
+    query = Link.objects.filter(code=code)
     if exclude is not None:
         query = query.exclude(pk=exclude.pk)
     return not query.exists()

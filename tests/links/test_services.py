@@ -134,6 +134,20 @@ def test_update_link_changes_code_and_keeps_history(owner_membership):
     assert Link.objects.count() == 1
 
 
+def test_update_link_keeps_a_generated_code_unchanged_when_resubmitted(owner_membership):
+    # The edit form seeds its code field from `link.code` and re-submits it unchanged;
+    # a generated code must survive that round trip untouched (I7/I10).
+    link = services.create_link(owner_membership, destination_url="https://example.com/a")
+    original_code = link.code
+    updated = services.update_link(
+        owner_membership,
+        link,
+        destination_url="https://example.com/b",
+        code=link.code,
+    )
+    assert updated.code == original_code
+
+
 def test_archive_and_restore(owner_membership):
     link = services.create_link(owner_membership, destination_url="https://example.com")
     services.archive_link(owner_membership, link)

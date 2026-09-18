@@ -140,7 +140,7 @@
   (function () {
     var button = document.getElementById("randomize-code");
     if (!button) return;
-    var alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    var alphabet = "abcdefghijkmnpqrstuvwxyz23456789";
     button.addEventListener("click", function () {
       var code = "";
       for (var i = 0; i < 7; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
