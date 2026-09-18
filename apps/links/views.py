@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -28,32 +29,40 @@ def _form_context(request, form, link=None):
     }
 
 
+def _save_link(request, form, link=None):
+    """Create or update, mapping service errors onto the form. Returns the link or None."""
+    editable = {
+        key: form.cleaned_data[key] for key in services.EDITABLE_FIELDS if key != "destination_url"
+    }
+    kwargs = {
+        "destination_url": form.cleaned_data["destination_url"],
+        "tags": form.tag_names(),
+        "targets": target_rows(request.POST),
+        **editable,
+        "expires_at": form.cleaned_data["expires_at"],
+        "max_clicks": form.cleaned_data["max_clicks"],
+    }
+    try:
+        if link is None:
+            return services.create_link(
+                request.membership, code=form.cleaned_data["code"], **kwargs
+            )
+        return services.update_link(
+            request.membership, link, code=form.cleaned_data["code"] or link.code, **kwargs
+        )
+    except ValidationError as error:
+        form.add_error(None, error.messages[0])
+    except services.InvalidOperation as error:
+        form.add_error(None, str(error))
+    return None
+
+
 @require_role()
 @require_http_methods(["GET", "POST"])
 def create(request, slug):
     form = LinkForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        editable = {
-            key: form.cleaned_data[key]
-            for key in services.EDITABLE_FIELDS
-            if key != "destination_url"
-        }
-        try:
-            services.create_link(
-                request.membership,
-                destination_url=form.cleaned_data["destination_url"],
-                code=form.cleaned_data["code"],
-                tags=form.tag_names(),
-                targets=target_rows(request.POST),
-                **editable,
-                expires_at=form.cleaned_data["expires_at"],
-                max_clicks=form.cleaned_data["max_clicks"],
-            )
-        except ValidationError as error:
-            form.add_error(None, error.messages[0])
-        except services.InvalidOperation as error:
-            form.add_error(None, str(error))
-        else:
+        if _save_link(request, form) is not None:
             return redirect("links:list", slug=slug)
     return render(request, "links/form.html", _form_context(request, form))
 
@@ -76,28 +85,7 @@ def edit(request, slug, code):
     }
     form = LinkForm(request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
-        editable = {
-            key: form.cleaned_data[key]
-            for key in services.EDITABLE_FIELDS
-            if key != "destination_url"
-        }
-        try:
-            services.update_link(
-                request.membership,
-                link,
-                destination_url=form.cleaned_data["destination_url"],
-                code=form.cleaned_data["code"] or link.code,
-                tags=form.tag_names(),
-                targets=target_rows(request.POST),
-                **editable,
-                expires_at=form.cleaned_data["expires_at"],
-                max_clicks=form.cleaned_data["max_clicks"],
-            )
-        except ValidationError as error:
-            form.add_error(None, error.messages[0])
-        except services.InvalidOperation as error:
-            form.add_error(None, str(error))
-        else:
+        if _save_link(request, form, link) is not None:
             return redirect("links:list", slug=slug)
     return render(request, "links/form.html", _form_context(request, form, link))
 
@@ -138,6 +126,18 @@ def code_check(request, slug):
 @require_role()
 @require_POST
 def metadata(request, slug):
+    if not ratelimit.hit(
+        "link-metadata",
+        str(request.user.pk),
+        settings.LINK_METADATA_RATE,
+        settings.LINK_METADATA_RATE_WINDOW,
+    ):
+        return render(
+            request,
+            "links/partials/metadata.html",
+            {"error": "Too many lookups. Try again in a moment."},
+            status=429,
+        )
     from .tasks import extract_metadata
 
     try:

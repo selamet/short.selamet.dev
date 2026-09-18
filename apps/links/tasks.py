@@ -92,6 +92,21 @@ def _fetch_html(url):
     raise RuntimeError("too many redirects")
 
 
+def _safe_url(value):
+    """Drop a URL whose scheme is not http/https.
+
+    Fetched page content can advertise anything as a favicon or og:image href,
+    including `javascript:`/`data:` URLs; those must never be stored or rendered
+    as a link/image source. This is a scheme check only, no DNS lookup: it runs
+    against already-fetched content, not before an outbound request.
+    """
+    if not value:
+        return ""
+    if urlsplit(value).scheme.lower() not in ("http", "https"):
+        return ""
+    return value
+
+
 def extract_metadata(url):
     """Validate, fetch and parse a destination's title, favicon and Open Graph tags."""
     html = _fetch_html(url)
@@ -99,13 +114,13 @@ def extract_metadata(url):
     parser.feed(html or "")
     og_title = parser.og.get("og:title", "")
     title = og_title or parser.title
-    favicon_url = urljoin(url, parser.icon)[:1024] if parser.icon else ""
+    favicon_url = _safe_url(urljoin(url, parser.icon)[:1024]) if parser.icon else ""
     return {
         "title": title[:200],
         "favicon_url": favicon_url,
         "og_title": og_title[:200],
         "og_description": parser.og.get("og:description", "")[:400],
-        "og_image_url": parser.og.get("og:image", "")[:1024],
+        "og_image_url": _safe_url(parser.og.get("og:image", "")[:1024]),
     }
 
 

@@ -43,6 +43,18 @@ def test_fetch_link_metadata_falls_back_to_the_title_tag(link, monkeypatch):
     assert link.og_title == ""
 
 
+def test_fetch_link_metadata_drops_an_unsafe_og_image_url(link, monkeypatch):
+    monkeypatch.setattr(
+        "apps.links.tasks._fetch_html",
+        lambda url: (
+            '<html><head><meta property="og:image" content="javascript:alert(1)"></head></html>'
+        ),
+    )
+    fetch_link_metadata.enqueue(link.pk)
+    link.refresh_from_db()
+    assert link.og_image_url == ""
+
+
 def test_fetch_link_metadata_never_overwrites_an_override(link, monkeypatch):
     link.og_title = "Mine"
     link.og_overridden = True

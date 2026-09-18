@@ -133,6 +133,55 @@ def test_metadata_fragment_reports_a_bad_url(member_client):
     assert "http://" in response.content.decode()
 
 
+def test_metadata_lookup_is_rate_limited(member_client, monkeypatch, settings):
+    settings.LINK_METADATA_RATE = 1
+    calls = []
+
+    def fake_fetch_html(url):
+        calls.append(url)
+        return "<html><head><title>Hello</title></head></html>"
+
+    monkeypatch.setattr("apps.links.tasks._fetch_html", fake_fetch_html)
+    first = member_client.post(
+        url("metadata"), {"destination_url": "https://example.com"}, HTTP_HX_REQUEST="true"
+    )
+    assert first.status_code == 200
+    second = member_client.post(
+        url("metadata"), {"destination_url": "https://example.com"}, HTTP_HX_REQUEST="true"
+    )
+    assert second.status_code == 429
+    assert "Too many lookups" in second.content.decode()
+    assert calls == ["https://example.com"]
+
+
+def test_create_link_rejects_a_javascript_image_url(member_client, workspace):
+    response = member_client.post(
+        url("create"),
+        {
+            "destination_url": "https://example.com",
+            "code": "",
+            "og_image_url": "javascript:alert(1)",
+        },
+    )
+    assert response.status_code == 200
+    assert "http://" in response.content.decode()
+    assert not Link.objects.exists()
+
+
+def test_create_link_rejects_a_private_image_url(member_client, workspace):
+    response = member_client.post(
+        url("create"),
+        {
+            "destination_url": "https://example.com",
+            "code": "",
+            "og_image_url": "http://127.0.0.1/x.png",
+        },
+    )
+    assert response.status_code == 200
+    assert "Private and local addresses" in response.content.decode()
+    assert not Link.objects.exists()
+
+
 def test_utm_preset_fragment_fills_fields(member_client):
     response = member_client.post(
         url("utm_preset"),

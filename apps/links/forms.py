@@ -35,6 +35,14 @@ class LinkForm(forms.Form):
             return ""
         return code_utils.validate_code(value)
 
+    def clean_og_image_url(self):
+        # An override image on a private/local address is as unwanted as a
+        # destination on one; same rules, no DNS check (this isn't an outbound fetch).
+        value = (self.cleaned_data.get("og_image_url") or "").strip()
+        if not value:
+            return ""
+        return destinations.validate_destination(value)
+
     def tag_names(self):
         raw = self.cleaned_data.get("tags", "")
         return [part.strip() for part in raw.split(",") if part.strip()]
