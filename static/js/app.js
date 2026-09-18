@@ -68,9 +68,10 @@
     if (!modal) return;
     if (target === modal) {
       // The confirm dialog was just swapped into the modal host: remember what
-      // triggered it and move focus into the dialog.
+      // triggered it and move focus into the dialog itself, not its backdrop wrapper.
       modalTrigger = document.activeElement;
-      if (modal.firstElementChild) modal.firstElementChild.focus();
+      const dialog = modal.querySelector('[role="dialog"]');
+      if (dialog) dialog.focus();
       return;
     }
     if (modal.firstElementChild && !modal.contains(target)) closeModal();
