@@ -29,6 +29,22 @@ def daily_salt(day=None):
     )
 
 
+def rotate_salt(day=None):
+    """Force a fresh salt for `day` (today by default), replacing whatever
+    daily_salt() already cached for it, and leaving every other day's key untouched.
+
+    daily_salt() only ever creates a day's salt lazily, on its first call for that
+    day, so nothing otherwise forces that rotation to happen right at local
+    midnight -- whichever click is first to hash an IP after midnight would decide
+    the whole day's salt. Running this once a day (see
+    apps.analytics.tasks.rotate_ip_salt) puts that rotation on a schedule instead.
+    """
+    day = day or timezone.now().date()
+    token = secrets.token_hex(16)
+    cache.set(f"ipsalt:{day.isoformat()}", token, timeout=salt_timeout(timezone.now()))
+    return token
+
+
 def hash_ip(ip):
     if not ip:
         return ""

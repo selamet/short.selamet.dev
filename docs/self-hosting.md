@@ -1,6 +1,6 @@
 # Self-hosting short
 
-short ships as a single Docker image that runs two processes from `compose.yaml`: `web` (gunicorn) and `worker` (`manage.py db_worker`, the Django tasks worker). TLS, the public port and the data stores are provided by the host.
+short ships as a single Docker image that runs two processes from `compose.yaml`: `web` (gunicorn) and `worker` (`manage.py db_worker`, the Django tasks worker, alongside `supercronic` running a small crontab of scheduled jobs -- see below). TLS, the public port and the data stores are provided by the host.
 
 ## What you need
 
@@ -73,6 +73,20 @@ Clicks can be tagged with a country and city if you point `GEOIP_PATH` at a GeoL
 3. Set `GEOIP_PATH=/data/GeoLite2-City.mmdb` in `.env` and restart the `web` and `worker` services.
 
 The database is licensed by MaxMind and updated periodically; it is never committed to this repository (`*.mmdb` is gitignored) and you are responsible for keeping your own copy up to date.
+
+## Scheduled jobs
+
+The `worker` container runs `supercronic` against `docker/crontab` alongside the task worker. Each line only enqueues work (`manage.py enqueue_scheduled <name>`); the worker process executes it, same as any other task:
+
+| Schedule | Job | What it does |
+|---|---|---|
+| `0 2 * * *` | `rebuild_daily_stats` | Recomputes yesterday's rollups from raw clicks, correcting anything the incremental path missed. |
+| `30 2 * * *` | `purge_click_events` | Deletes raw `ClickEvent` rows (and their identity rows) older than `CLICK_EVENT_RETENTION_DAYS`, in batches of `ANALYTICS_PURGE_BATCH_SIZE`. |
+| `0 0 * * *` | `rotate_ip_salt` | Rotates the day's IP-hashing salt right at midnight. |
+| every 10 minutes | `expire_links` | Disables links past `expires_at` or `max_clicks`. |
+| `0 3 * * *` | `prune_db_task_results` | The existing django-tasks-db result cleanup, run directly rather than through `enqueue_scheduled` since it does its own work synchronously. |
+
+Nothing in the `web` process schedules anything; if you run `worker` on a separate host or scale it to zero, these jobs simply stop running until it's back.
 
 ## Notes
 

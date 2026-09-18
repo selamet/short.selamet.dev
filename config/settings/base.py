@@ -76,6 +76,9 @@ DEEP_LINK_FALLBACK_MS = env.int("DEEP_LINK_FALLBACK_MS", default=1500)
 # How long ClickEvent rows are kept before the retention purge task (owned by the
 # analytics issue) deletes them.
 CLICK_EVENT_RETENTION_DAYS = env.int("CLICK_EVENT_RETENTION_DAYS", default=90)
+# How many rows the nightly purge_click_events task deletes per batch, so purging a
+# large backlog never holds one long-running DELETE.
+ANALYTICS_PURGE_BATCH_SIZE = env.int("ANALYTICS_PURGE_BATCH_SIZE", default=5000)
 # Path to a GeoLite2 City .mmdb file. Optional: leave empty (the default) to run
 # without geographic resolution, which is the case for a fresh self-hosted install
 # until an operator downloads a database and sets this (see docs/self-hosting.md).

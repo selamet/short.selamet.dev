@@ -23,6 +23,18 @@ ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PATH="/opt/venv/bin:$PATH" \
     DJANGO_SETTINGS_MODULE=config.settings.prod
 RUN apt-get update && apt-get install -y --no-install-recommends libpq5 curl && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 app
+# supercronic runs the crontab that drives the scheduled analytics/maintenance jobs
+# (see docker/crontab and compose.yaml); pinned to v0.2.49, amd64 (the only
+# architecture this image is built for -- see .github/workflows), with its checksum
+# verified against the release's own published SHA256 asset digest
+# (https://github.com/aptible/supercronic/releases/tag/v0.2.49) before pinning it
+# here.
+ENV SUPERCRONIC_VERSION=v0.2.49 \
+    SUPERCRONIC_URL=https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 \
+    SUPERCRONIC_SHA256=a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe3724430c1
+RUN curl -fsSLo /usr/local/bin/supercronic "$SUPERCRONIC_URL" \
+    && echo "${SUPERCRONIC_SHA256}  /usr/local/bin/supercronic" | sha256sum -c - \
+    && chmod +x /usr/local/bin/supercronic
 WORKDIR /app
 COPY --from=deps /opt/venv /opt/venv
 COPY --chown=app:app . .
