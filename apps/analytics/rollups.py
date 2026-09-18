@@ -192,37 +192,55 @@ def rebuild(link, day):
     order, so a plain set is enough to find each identity's first occurrence here,
     where DailyClickIdentity's unique constraint is what finds it under concurrent
     writers.
+
+    The three deletes run before the events are read, not after: PostgreSQL's default
+    READ COMMITTED isolation gives each statement in this transaction a fresh
+    snapshot as of when that statement starts, not as of when the transaction opened,
+    so reading the events after the delete (rather than before it, as a naive
+    "collect the truth, then replace the rows" ordering would) means a concurrent
+    apply_event() that commits its ClickEvent in the gap between the delete and the
+    read is visible to the read and gets counted here; one that commits after the
+    read has already started (and therefore after this rebuild has already decided
+    the day's totals) instead lands its own increment through _upsert()'s
+    get_or_create()/F()-update, which blocks on this transaction's row lock until it
+    commits and then applies cleanly on top of what was just written. Either way,
+    nothing that happens concurrently is silently lost -- reading first and deleting
+    second, the order this replaced, could lose exactly such a click: read the old
+    totals, have a new one commit, then delete and overwrite with the now-stale
+    totals that never saw it.
     """
     workspace = link.workspace
     start, end = _day_bounds(workspace, day)
-    events = ClickEvent.objects.filter(
-        link=link, occurred_at__gte=start, occurred_at__lt=end
-    ).order_by("occurred_at")
-
-    totals = {"clicks": 0, "unique_clicks": 0, "bot_clicks": 0}
-    breakdown_totals = {}
-    identities_seen = set()
-    identities_to_create = []
-    for event in events:
-        totals["clicks"] += 1
-        if event.is_bot:
-            totals["bot_clicks"] += 1
-        else:
-            # A bot event never claims an identity (see _claim_identity), so it can
-            # never block a later genuine click that happens to share one.
-            identity = _identity(event.ip_hash, event.user_agent)
-            if identity not in identities_seen:
-                identities_seen.add(identity)
-                identities_to_create.append(identity)
-                totals["unique_clicks"] += 1
-        for dimension, value in dimensions_for(event):
-            key = (dimension, value)
-            breakdown_totals[key] = breakdown_totals.get(key, 0) + 1
 
     with transaction.atomic():
         DailyLinkStat.objects.filter(link=link, date=day).delete()
         DailyLinkBreakdown.objects.filter(link=link, date=day).delete()
         DailyClickIdentity.objects.filter(link=link, date=day).delete()
+
+        events = ClickEvent.objects.filter(
+            link=link, occurred_at__gte=start, occurred_at__lt=end
+        ).order_by("occurred_at")
+
+        totals = {"clicks": 0, "unique_clicks": 0, "bot_clicks": 0}
+        breakdown_totals = {}
+        identities_seen = set()
+        identities_to_create = []
+        for event in events:
+            totals["clicks"] += 1
+            if event.is_bot:
+                totals["bot_clicks"] += 1
+            else:
+                # A bot event never claims an identity (see _claim_identity), so it
+                # can never block a later genuine click that happens to share one.
+                identity = _identity(event.ip_hash, event.user_agent)
+                if identity not in identities_seen:
+                    identities_seen.add(identity)
+                    identities_to_create.append(identity)
+                    totals["unique_clicks"] += 1
+            for dimension, value in dimensions_for(event):
+                key = (dimension, value)
+                breakdown_totals[key] = breakdown_totals.get(key, 0) + 1
+
         if totals["clicks"]:
             DailyLinkStat.objects.create(link=link, workspace=workspace, date=day, **totals)
         DailyLinkBreakdown.objects.bulk_create(

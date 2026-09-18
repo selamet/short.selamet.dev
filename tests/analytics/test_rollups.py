@@ -4,7 +4,8 @@ DailyLinkBreakdown, and the from-scratch rebuild of both from raw ClickEvent row
 from datetime import UTC, datetime
 
 import pytest
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
+from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from apps.analytics import attribution, rollups
@@ -187,6 +188,72 @@ def test_rebuild_reproduces_exactly_the_same_rows(link):
     assert (after_stat.clicks, after_stat.unique_clicks, after_stat.bot_clicks) == before
     assert after_breakdown == before_breakdown
     assert after_identities == before_identities
+
+
+@pytest.mark.django_db
+def test_rebuild_includes_a_click_that_commits_between_the_delete_and_the_read(link, monkeypatch):
+    """Regression test for the ordering bug in rebuild(): it used to read the day's
+    events before opening its transaction (and therefore before deleting anything),
+    so a click that landed in the gap between that read and the delete was applied to
+    a row the rebuild then deleted, and lost from the rollups permanently.
+
+    Simulated by patching QuerySet.delete, at the class level, to commit an extra
+    click the first time anything calls .delete() -- which is exactly rebuild's own
+    first delete, whichever of the three it happens to be -- rather than hooking a
+    call shape only the fixed implementation happens to use. Against the old
+    read-then-delete ordering, this extra click is created too late to ever be seen
+    by the read that already ran, and this test fails; against the fix, delete runs
+    first and the subsequent read sees it.
+    """
+    rollups.apply_event(_event(link, ip_hash=IP_A))
+    today = timezone.localdate()
+    original_delete = QuerySet.delete
+    triggered = False
+
+    def delete_then_click(self, *args, **kwargs):
+        nonlocal triggered
+        result = original_delete(self, *args, **kwargs)
+        if not triggered:
+            triggered = True
+            # Simulates a click whose transaction (the ClickEvent write) commits in
+            # the gap between rebuild's delete and its read of raw events -- only the
+            # raw event matters to that read, the same one record_click's
+            # ClickEvent.objects.create() writes before rollups.apply_event ever
+            # touches the rollup tables, so this creates exactly that and nothing
+            # more (applying it too would race rebuild's own from-scratch writes to
+            # those same rollup rows, which is not what this is testing).
+            _event(link, ip_hash=IP_B)
+        return result
+
+    monkeypatch.setattr(QuerySet, "delete", delete_then_click)
+
+    rollups.rebuild(link, today)
+
+    stat = DailyLinkStat.objects.get(link=link, date=today)
+    assert stat.clicks == 2
+    assert stat.unique_clicks == 2
+
+
+@pytest.mark.django_db
+def test_a_genuine_duplicate_identity_insert_keeps_the_transaction_usable(link):
+    """A real IntegrityError from a concurrent duplicate -- not a monkeypatched one --
+    must leave the caller's outer transaction usable afterward: _claim_identity()
+    catches it from inside its own nested atomic() (a savepoint), specifically so the
+    error rolls back only that savepoint rather than poisoning the whole transaction
+    (PostgreSQL otherwise refuses any further query on a transaction that has already
+    hit a database error). Proven here by claiming the same identity twice inside one
+    still-open outer transaction.atomic() and running an ordinary query straight
+    after: with no savepoint, that query would raise
+    django.db.utils.InternalError/TransactionManagementError instead of running.
+    """
+    today = timezone.localdate()
+    event = _event(link, ip_hash=IP_A)
+    with transaction.atomic():
+        assert rollups._claim_identity(event, today) is True
+        assert rollups._claim_identity(event, today) is False
+        # If the IntegrityError above had poisoned this transaction, this query would
+        # raise rather than return.
+        assert DailyClickIdentity.objects.filter(link=link, date=today).count() == 1
 
 
 @pytest.mark.django_db
