@@ -1,6 +1,19 @@
 from django.db import models
 
 
+class Dimension(models.TextChoices):
+    COUNTRY = "country", "Country"
+    CITY = "city", "City"
+    REFERRER = "referrer", "Referrer"
+    DEVICE = "device", "Device"
+    OS = "os", "Operating system"
+    BROWSER = "browser", "Browser"
+    UTM_SOURCE = "utm_source", "UTM source"
+    UTM_MEDIUM = "utm_medium", "UTM medium"
+    UTM_CAMPAIGN = "utm_campaign", "UTM campaign"
+    TARGET_PLATFORM = "target_platform", "Target platform"
+
+
 class ClickEvent(models.Model):
     """One redirect served. Raw addresses are never stored, only a daily-salted hash.
 
@@ -43,3 +56,54 @@ class ClickEvent(models.Model):
 
     def __str__(self):
         return f"click {self.link_id} @ {self.occurred_at:%Y-%m-%d %H:%M}"
+
+
+class DailyLinkStat(models.Model):
+    """One row per link per day. The dashboard reads these, never the raw events."""
+
+    link = models.ForeignKey("links.Link", on_delete=models.CASCADE, related_name="daily_stats")
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_stats"
+    )
+    date = models.DateField()
+    clicks = models.PositiveIntegerField(default=0)
+    unique_clicks = models.PositiveIntegerField(default=0)
+    bot_clicks = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-date"]
+        constraints = [
+            models.UniqueConstraint(fields=["link", "date"], name="analytics_daily_stat_unique")
+        ]
+        indexes = [models.Index(fields=["workspace", "-date"])]
+
+    def __str__(self):
+        return f"stats {self.link_id} @ {self.date}"
+
+
+class DailyLinkBreakdown(models.Model):
+    """One row per link, day, dimension and value."""
+
+    link = models.ForeignKey(
+        "links.Link", on_delete=models.CASCADE, related_name="daily_breakdowns"
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_breakdowns"
+    )
+    date = models.DateField()
+    dimension = models.CharField(max_length=20, choices=Dimension.choices)
+    value = models.CharField(max_length=255)
+    clicks = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-clicks"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["link", "date", "dimension", "value"],
+                name="analytics_daily_breakdown_unique",
+            )
+        ]
+        indexes = [models.Index(fields=["workspace", "date", "dimension"])]
+
+    def __str__(self):
+        return f"breakdown {self.link_id} @ {self.date} {self.dimension}={self.value}"

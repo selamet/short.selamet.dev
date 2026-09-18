@@ -13,7 +13,7 @@ from django.utils.dateparse import parse_datetime
 
 from apps.links.models import Link
 
-from . import useragent
+from . import rollups, useragent
 from .models import ClickEvent
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ def record_click(
     # increment happens after, outside the transaction, since it is best-effort and a
     # cache outage must never roll back a successful write.
     with transaction.atomic():
-        ClickEvent.objects.create(
+        event = ClickEvent.objects.create(
             link=link,
             workspace_id=link.workspace_id,
             occurred_at=parse_datetime(occurred_at),
@@ -89,6 +89,21 @@ def record_click(
             **{name: _truncated(name, value) for name, value in string_fields.items()},
         )
         Link.objects.filter(pk=link_id).update(click_count=F("click_count") + 1)
+        try:
+            # Its own savepoint, not just a try/except: an exception raised while the
+            # outer atomic() block is still open would otherwise poison it (Postgres
+            # refuses any further query on a transaction that hit a database error),
+            # which would lose the ClickEvent and the counter update above along with
+            # the rollup. The nested atomic() rolls back only the rollup's own writes
+            # on failure, leaving the outer transaction free to commit.
+            with transaction.atomic():
+                rollups.apply_event(event)
+        except Exception:
+            # The event and the counter above are what matters; losing today's rollup
+            # for this one click is recoverable (the nightly rebuild recomputes the day
+            # from raw events), losing the click itself is not, so a rollup failure is
+            # logged and swallowed rather than allowed to roll back the write above.
+            logger.exception("rollup failed for click on link_id=%s", link_id)
     # Imported lazily to keep the app dependency one-directional: apps.redirects
     # already imports apps.analytics.tasks (to enqueue this very task), so a
     # module-level import here would be circular.
