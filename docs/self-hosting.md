@@ -82,7 +82,7 @@ The `worker` container runs `supercronic` against `docker/crontab` alongside the
 |---|---|---|
 | `0 2 * * *` | `rebuild_daily_stats` | Recomputes yesterday's rollups from raw clicks, correcting anything the incremental path missed. |
 | `30 2 * * *` | `purge_click_events` | Deletes raw `ClickEvent` rows (and their identity rows) older than `CLICK_EVENT_RETENTION_DAYS`, in batches of `ANALYTICS_PURGE_BATCH_SIZE`. |
-| `0 0 * * *` | `rotate_ip_salt` | Rotates the day's IP-hashing salt right at midnight. |
+| `0 0 * * *` | `rotate_ip_salt` | Makes sure the day's IP-hashing salt already exists right at midnight, without ever replacing one already in use. |
 | every 10 minutes | `expire_links` | Disables links past `expires_at` or `max_clicks`. |
 | `0 3 * * *` | `prune_db_task_results` | The existing django-tasks-db result cleanup, run directly rather than through `enqueue_scheduled` since it does its own work synchronously. |
 

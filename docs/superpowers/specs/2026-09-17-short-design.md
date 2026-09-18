@@ -125,7 +125,7 @@ Tasks use Django 6's `django.tasks` (`@task`, `.enqueue()`). Backend: `Immediate
 | `rebuild_daily_stats` | nightly 02:00 | recompute yesterday's rollups from raw events |
 | `expire_links` | every 10 min | disable links past `expires_at` or `max_clicks`, invalidate cache |
 | `purge_click_events` | nightly | delete events older than retention in batches |
-| `rotate_ip_salt` | nightly 00:00 | generate new daily salt, drop the previous one |
+| `rotate_ip_salt` | nightly 00:00 | make sure today's daily salt already exists; never replaces one already in use (see apps.core.privacy.ensure_daily_salt) |
 
 Scheduling: `django.tasks` has no scheduler. `supercronic` runs inside the worker container and calls `manage.py enqueue_scheduled <task>`; cron only triggers, work runs in the worker with retry semantics.
 

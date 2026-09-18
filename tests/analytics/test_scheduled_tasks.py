@@ -129,7 +129,11 @@ def test_purge_click_events_logs_how_many_it_removed(caplog, link):
 
 
 @pytest.mark.django_db
-def test_rotate_ip_salt_changes_todays_salt_and_leaves_yesterdays_alone():
+def test_rotate_ip_salt_leaves_an_already_cached_salt_unchanged():
+    # C3 regression test: rotate_ip_salt must never replace a salt already in use --
+    # a visitor who clicked before this job ran and hashed against `before_today`
+    # must still hash the same way after it runs, or they get counted as two unique
+    # visitors instead of one (see apps.core.privacy.ensure_daily_salt).
     today = datetime.now(tz=UTC).date()
     yesterday = today - timedelta(days=1)
     before_today = daily_salt(today)
@@ -137,7 +141,7 @@ def test_rotate_ip_salt_changes_todays_salt_and_leaves_yesterdays_alone():
 
     rotate_ip_salt.enqueue()
 
-    assert daily_salt(today) != before_today
+    assert daily_salt(today) == before_today
     assert daily_salt(yesterday) == before_yesterday
 
 

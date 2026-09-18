@@ -223,11 +223,18 @@ def purge_click_events():
 
 @task
 def rotate_ip_salt():
-    """Force today's IP-hashing salt (apps.core.privacy) to rotate right at
-    midnight rather than lazily on the day's first click, so every click after
-    midnight salts under a value this job picked, not whichever request got there
-    first."""
-    privacy.rotate_salt()
+    """Make sure today's IP-hashing salt (apps.core.privacy) already exists in the
+    cache right at midnight, rather than only lazily on the day's first click.
+
+    Despite the name, this never replaces a salt already in use (see
+    apps.core.privacy.ensure_daily_salt): a salt that gets replaced out from under
+    clicks already hashed against it is exactly the bug this job used to cause --
+    one visitor, salted two different ways either side of the "rotation", counted as
+    two unique clicks. Kept as `rotate_ip_salt` (not renamed) because the crontab
+    entry, the enqueue_scheduled command and the spec's task table all name it, and
+    a scheduled job's name is its interface.
+    """
+    privacy.ensure_daily_salt()
 
 
 @task
