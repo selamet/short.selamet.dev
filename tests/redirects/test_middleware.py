@@ -57,3 +57,33 @@ def test_an_ordinary_dashboard_page_still_carries_its_csp_header(client, db):
     that never touches the redirect path at all must keep getting its header."""
     response = client.get("/auth/login/")
     assert "'nonce-" in response["Content-Security-Policy"]
+
+
+@pytest.mark.django_db
+def test_redirect_does_not_set_vary_cookie(client, link):
+    response = client.get(f"/{link.code}", HTTP_USER_AGENT=DESKTOP_UA)
+    assert "Cookie" not in response.get("Vary", "")
+
+
+@pytest.mark.django_db
+def test_the_twenty_first_request_in_the_window_is_rate_limited(client, link, settings):
+    settings.REDIRECT_RATE_PER_IP = 20
+    settings.REDIRECT_RATE_PER_IP_WINDOW = 60
+    for _ in range(20):
+        response = client.get(f"/{link.code}", HTTP_USER_AGENT=DESKTOP_UA)
+        assert response.status_code == 302
+    blocked = client.get(f"/{link.code}", HTTP_USER_AGENT=DESKTOP_UA)
+    assert blocked.status_code == 429
+    assert blocked["Retry-After"] == "1"
+    assert blocked["Cache-Control"] == "no-store"
+    # A bare response: no template was rendered to produce it.
+    assert blocked.content == b""
+
+
+@pytest.mark.django_db
+def test_a_normal_visitor_is_unaffected_by_the_rate_limit(client, link, settings):
+    settings.REDIRECT_RATE_PER_IP = 20
+    settings.REDIRECT_RATE_PER_IP_WINDOW = 60
+    for _ in range(5):
+        response = client.get(f"/{link.code}", HTTP_USER_AGENT=DESKTOP_UA)
+        assert response.status_code == 302

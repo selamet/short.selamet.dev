@@ -4,9 +4,16 @@ A click should not cost a session lookup, a CSRF token or an authentication quer
 this sits directly after SecurityMiddleware and returns the response itself. Anything
 that is not a single path segment, or that starts with a path the app owns, falls
 through to the normal URL resolver.
+
+A per-IP rate limit is enforced here too, before a code is ever resolved, so a burst
+past the limit is rejected without touching the cache, the database or a template.
 """
 
 from django.conf import settings
+from django.http import HttpResponse
+
+from apps.core import ratelimit
+from apps.core.http import client_ip
 
 from . import views
 
@@ -21,6 +28,18 @@ class RedirectMiddleware:
         code = self._code_for(request.path)
         if code is None:
             return self.get_response(request)
+        if not ratelimit.hit(
+            "redirect",
+            client_ip(request),
+            settings.REDIRECT_RATE_PER_IP,
+            settings.REDIRECT_RATE_PER_IP_WINDOW,
+        ):
+            # Bare response, no template: rendering is exactly the cost this limit
+            # exists to avoid paying on every request in a burst.
+            response = HttpResponse(status=429)
+            response["Retry-After"] = "1"
+            response["Cache-Control"] = "no-store"
+            return response
         if code.endswith("+"):
             return views.preview(request, code[:-1])
         return views.redirect_view(request, code)

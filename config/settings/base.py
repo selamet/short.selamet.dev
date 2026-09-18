@@ -68,6 +68,10 @@ LINK_METADATA_RATE_PER_WORKSPACE_WINDOW = env.int(
 )
 REDIRECT_CACHE_TTL = env.int("REDIRECT_CACHE_TTL", default=3600)
 REDIRECT_MISS_TTL = env.int("REDIRECT_MISS_TTL", default=60)
+# Per-IP rate limit on the redirect path, enforced in apps.redirects.middleware before
+# a code is resolved.
+REDIRECT_RATE_PER_IP = env.int("REDIRECT_RATE_PER_IP", default=20)
+REDIRECT_RATE_PER_IP_WINDOW = env.int("REDIRECT_RATE_PER_IP_WINDOW", default=1)
 DEEP_LINK_FALLBACK_MS = env.int("DEEP_LINK_FALLBACK_MS", default=1500)
 # How long ClickEvent rows are kept before the retention purge task (owned by the
 # analytics issue) deletes them.

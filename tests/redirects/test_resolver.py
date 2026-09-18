@@ -104,3 +104,22 @@ def test_resolve_falls_back_to_the_database_when_the_cache_is_down(link, monkeyp
     monkeypatch.setattr("apps.redirects.cache.get_payload", lambda code: None)
     monkeypatch.setattr("apps.redirects.cache.set_payload", lambda code, payload: None)
     assert resolver.resolve(link.code, DESKTOP_UA).url == link.destination_url
+
+
+def test_a_missing_generated_length_code_creates_a_negative_cache_entry(db, settings):
+    settings.LINK_CODE_LENGTH = 7
+    code = "abcd234"  # 7 chars, all drawn from codes.ALPHABET
+    assert resolver.resolve(code, DESKTOP_UA) is None
+    assert redirect_cache.get_payload(code) == redirect_cache.MISS
+
+
+def test_a_missing_short_custom_code_creates_a_negative_cache_entry(db):
+    code = "a-plausible-code"  # short enough to be a typed custom code
+    assert resolver.resolve(code, DESKTOP_UA) is None
+    assert redirect_cache.get_payload(code) == redirect_cache.MISS
+
+
+def test_a_long_random_code_does_not_create_a_negative_cache_entry(db):
+    code = "x" * 35  # valid per CODE_RE, but far too long to be worth remembering
+    assert resolver.resolve(code, DESKTOP_UA) is None
+    assert redirect_cache.get_payload(code) is None
