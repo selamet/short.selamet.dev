@@ -5,7 +5,6 @@ lookup belongs to the analytics issue that owns that database and its licensing.
 """
 
 import logging
-from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 from django.db.models import F
 from django.tasks import task
@@ -17,34 +16,6 @@ from . import useragent
 from .models import ClickEvent
 
 logger = logging.getLogger(__name__)
-
-UTM_FIELDS = ("utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term")
-
-
-def _split_referrer(referrer):
-    """The referrer's host and a credential-and-query-and-fragment-free URL, or
-    `("", "")` when there is no referrer to parse.
-
-    Built from `hostname`/`port`, not `netloc`, so any userinfo (`user:pass@`) in the
-    original URL is dropped along with the query string and fragment rather than
-    ending up stored.
-    """
-    if not referrer:
-        return "", ""
-    parts = urlsplit(referrer)
-    host = parts.hostname or ""
-    if not host:
-        return "", ""
-    netloc = f"[{host}]" if ":" in host else host
-    if parts.port:
-        netloc = f"{netloc}:{parts.port}"
-    clean_url = urlunsplit((parts.scheme, netloc, parts.path, "", ""))
-    return host, clean_url
-
-
-def _utm_from_query_string(query_string):
-    params = parse_qs(query_string or "")
-    return {field: (params.get(field) or [""])[0] for field in UTM_FIELDS}
 
 
 def _truncated(field_name, value):
@@ -61,14 +32,31 @@ def _truncated(field_name, value):
 
 @task
 def record_click(
-    link_id, *, occurred_at, ip_hash, user_agent, referrer, query_string, target_platform
+    link_id,
+    *,
+    occurred_at,
+    ip_hash,
+    user_agent,
+    referrer_host,
+    referrer_url,
+    utm_source,
+    utm_medium,
+    utm_campaign,
+    utm_content,
+    utm_term,
+    target_platform,
 ):
+    """Record one click. Takes `referrer_host`/`referrer_url` and the five UTM values
+    already split out of the raw referrer and query string (see
+    `apps.analytics.attribution`), never the raw values themselves: the production
+    task backend persists its arguments to the database, and credentials or an
+    unbounded query string must never reach that table.
+    """
     try:
         link = Link.objects.get(pk=link_id)
     except Link.DoesNotExist:
         logger.warning("click recording skipped: link_id=%s no longer exists", link_id)
         return
-    referrer_host, referrer_url = _split_referrer(referrer)
     string_fields = {
         "ip_hash": ip_hash,
         "device_type": useragent.device_type(user_agent),
@@ -78,7 +66,11 @@ def record_click(
         "referrer_url": referrer_url,
         "target_platform": target_platform,
         "user_agent": user_agent,
-        **_utm_from_query_string(query_string),
+        "utm_source": utm_source,
+        "utm_medium": utm_medium,
+        "utm_campaign": utm_campaign,
+        "utm_content": utm_content,
+        "utm_term": utm_term,
     }
     ClickEvent.objects.create(
         link=link,

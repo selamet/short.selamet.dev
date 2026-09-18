@@ -12,6 +12,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.utils import timezone
 
+from apps.analytics import attribution
 from apps.analytics.tasks import record_click
 from apps.core.http import client_ip
 from apps.core.privacy import hash_ip
@@ -32,6 +33,13 @@ def _error_page(request, template, status):
 
 
 def _record(request, resolution):
+    # Split here, not in the task: the production task backend persists its arguments
+    # to the database, and the raw referrer (which can carry credentials in its
+    # userinfo) and the raw query string must never land there.
+    referrer_host, referrer_url = attribution.split_referrer(
+        request.META.get("HTTP_REFERER", "")[:1024]
+    )
+    utm = attribution.utm_from_query_string(request.META.get("QUERY_STRING", "")[:1024])
     try:
         record_click.enqueue(
             resolution.link_id,
@@ -40,9 +48,10 @@ def _record(request, resolution):
             # arguments to the database, and an IP address must never land there raw.
             ip_hash=hash_ip(client_ip(request)),
             user_agent=request.META.get("HTTP_USER_AGENT", "")[:256],
-            referrer=request.META.get("HTTP_REFERER", "")[:1024],
-            query_string=request.META.get("QUERY_STRING", "")[:1024],
+            referrer_host=referrer_host,
+            referrer_url=referrer_url,
             target_platform=resolution.platform,
+            **utm,
         )
     except Exception:
         # A click we cannot record is worth less than a redirect we fail to serve.

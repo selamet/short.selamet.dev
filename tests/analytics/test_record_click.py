@@ -1,6 +1,7 @@
 import pytest
 from django.utils import timezone
 
+from apps.analytics import attribution
 from apps.analytics.models import ClickEvent
 from apps.analytics.tasks import record_click
 from apps.core.privacy import hash_ip
@@ -14,14 +15,25 @@ from tests.redirects.conftest import DESKTOP_UA, IOS_UA
 IP_HASH = hash_ip("203.0.113.9")
 
 
-def _record(link, **overrides):
+def _record(
+    link,
+    referrer="https://www.instagram.com/acme/",
+    query_string="utm_source=instagram&utm_medium=bio",
+    **overrides,
+):
+    """Builds the kwargs record_click actually receives: the view splits the raw
+    referrer and query string before enqueuing (see apps.analytics.attribution), so
+    tests do the same split here rather than passing raw values the task no longer
+    accepts."""
+    referrer_host, referrer_url = attribution.split_referrer(referrer)
     payload = {
         "occurred_at": timezone.now().isoformat(),
         "ip_hash": IP_HASH,
         "user_agent": DESKTOP_UA,
-        "referrer": "https://www.instagram.com/acme/",
-        "query_string": "utm_source=instagram&utm_medium=bio",
+        "referrer_host": referrer_host,
+        "referrer_url": referrer_url,
         "target_platform": "desktop",
+        **attribution.utm_from_query_string(query_string),
     }
     payload.update(overrides)
     record_click.enqueue(link.pk, **payload)
@@ -126,9 +138,10 @@ def test_a_deleted_link_is_skipped_quietly(link, caplog):
         occurred_at=timezone.now().isoformat(),
         ip_hash="",
         user_agent="",
-        referrer="",
-        query_string="",
+        referrer_host="",
+        referrer_url="",
         target_platform="desktop",
+        **attribution.utm_from_query_string(""),
     )
     assert ClickEvent.objects.count() == 0
     assert "no longer exists" in caplog.text

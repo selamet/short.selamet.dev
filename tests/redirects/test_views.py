@@ -202,6 +202,34 @@ def test_click_recording_hashes_an_empty_client_ip_to_an_empty_string(link, monk
 
 
 @pytest.mark.django_db
+def test_click_recording_strips_credentials_and_the_query_string_before_enqueuing(
+    link, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    Client().get(
+        f"/{link.code}",
+        HTTP_USER_AGENT=DESKTOP_UA,
+        HTTP_REFERER="https://user:secret@example.com/p?t=1#frag",
+        QUERY_STRING="utm_source=instagram&t=1",
+    )
+    assert len(calls) == 1
+    _args, kwargs = calls[0]
+    assert "referrer" not in kwargs
+    assert "query_string" not in kwargs
+    assert kwargs["referrer_host"] == "example.com"
+    assert kwargs["referrer_url"] == "https://example.com/p"
+    assert "user" not in kwargs["referrer_url"]
+    assert "secret" not in kwargs["referrer_url"]
+    assert "t=1" not in kwargs["referrer_url"]
+    assert "frag" not in kwargs["referrer_url"]
+    assert kwargs["utm_source"] == "instagram"
+    for value in kwargs.values():
+        assert "secret" not in str(value)
+        assert "frag" not in str(value)
+
+
+@pytest.mark.django_db
 def test_deep_link_falls_back_to_the_destination_when_no_web_fallback_is_set(monkeypatch):
     """The link service refuses to store an app scheme without a web fallback, so build
     the Resolution directly to exercise the page's own defense against that case."""
