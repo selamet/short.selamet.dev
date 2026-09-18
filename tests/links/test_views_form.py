@@ -154,7 +154,26 @@ def test_metadata_fragment_reports_a_bad_url(member_client):
         url("metadata"), {"destination_url": "javascript:alert(1)"}, HTTP_HX_REQUEST="true"
     )
     assert response.status_code == 422
-    assert "http://" in response.content.decode()
+    assert "Could not read that page" in response.content.decode()
+
+
+def test_metadata_fragment_gives_identical_responses_for_a_blocked_and_an_unreachable_host(
+    member_client, monkeypatch
+):
+    blocked = member_client.post(
+        url("metadata"), {"destination_url": "http://127.0.0.1/"}, HTTP_HX_REQUEST="true"
+    )
+
+    def boom(url):
+        raise TimeoutError("connection timed out")
+
+    monkeypatch.setattr("apps.links.tasks._fetch_html", boom)
+    unreachable = member_client.post(
+        url("metadata"), {"destination_url": "https://unreachable.example"}, HTTP_HX_REQUEST="true"
+    )
+
+    assert blocked.status_code == unreachable.status_code == 422
+    assert blocked.content == unreachable.content
 
 
 def test_metadata_lookup_is_rate_limited(member_client, monkeypatch, settings):

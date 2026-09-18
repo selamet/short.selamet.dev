@@ -185,6 +185,7 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     if destination_url is not None:
         new_destination = destinations.validate_destination(destination_url, check_dns=True)
         if new_destination != link.destination_url:
+            _check_rate_limits(actor)
             link.destination_url = new_destination
             link.og_fetched_at = None
             changed += ["destination_url", "og_fetched_at"]
@@ -229,6 +230,15 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
 def _set_status(actor, link, status, event):
     _require_manage(actor)
     _require_same_workspace(actor, link)
+    # A light throttle of its own (distinct scope from link creation/destination edits)
+    # so archiving/restoring in a loop cannot be used to spam the audit log.
+    if not ratelimit.hit(
+        "link-status-user",
+        str(actor.user_id),
+        settings.LINK_RATE_PER_USER,
+        settings.LINK_RATE_PER_USER_WINDOW,
+    ):
+        raise InvalidOperation("Too many changes. Slow down for a moment.")
     link.status = status
     link.save(update_fields=["status"])
     logger.info(

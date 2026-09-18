@@ -158,6 +158,26 @@ def test_archive_and_restore(owner_membership):
     assert link.status == Link.Status.ACTIVE
 
 
+def test_update_link_destination_change_is_rate_limited(owner_membership, settings):
+    settings.LINK_RATE_PER_USER = 1
+    link = services.create_link(owner_membership, destination_url="https://example.com/a")
+    with pytest.raises(services.InvalidOperation):
+        services.update_link(owner_membership, link, destination_url="https://example.com/b")
+
+
+def test_archive_is_rate_limited_on_its_own_scope(owner_membership, settings):
+    link1 = services.create_link(
+        owner_membership, destination_url="https://example.com/a", code="one"
+    )
+    link2 = services.create_link(
+        owner_membership, destination_url="https://example.com/b", code="two"
+    )
+    settings.LINK_RATE_PER_USER = 1
+    services.archive_link(owner_membership, link1)
+    with pytest.raises(services.InvalidOperation):
+        services.archive_link(owner_membership, link2)
+
+
 def test_services_reject_a_link_from_another_workspace(owner_membership, other_membership):
     link = services.create_link(owner_membership, destination_url="https://example.com")
     with pytest.raises(services.InvalidOperation):

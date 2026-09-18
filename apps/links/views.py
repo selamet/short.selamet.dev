@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
@@ -13,6 +15,8 @@ from . import codes as code_utils
 from . import services, utm
 from .forms import LinkForm, target_rows
 from .models import Link, Tag
+
+logger = logging.getLogger(__name__)
 
 CARD_PLATFORMS = {"whatsapp": "WhatsApp", "x": "X", "linkedin": "LinkedIn", "slack": "Slack"}
 
@@ -98,7 +102,12 @@ def code_check(request, slug):
     raw = request.GET.get("code", "")
     if not raw:
         return render(request, "links/partials/code_check.html", {"state": "empty"})
-    if not ratelimit.hit("link-code-check", str(request.user.pk), 60, 60):
+    if not ratelimit.hit(
+        "link-code-check",
+        str(request.user.pk),
+        settings.LINK_CODE_CHECK_RATE,
+        settings.LINK_CODE_CHECK_RATE_WINDOW,
+    ):
         return render(
             request,
             "links/partials/code_check.html",
@@ -128,12 +137,19 @@ def code_check(request, slug):
 @require_role()
 @require_POST
 def metadata(request, slug):
-    if not ratelimit.hit(
-        "link-metadata",
+    user_ok = ratelimit.hit(
+        "link-metadata-user",
         str(request.user.pk),
         settings.LINK_METADATA_RATE,
         settings.LINK_METADATA_RATE_WINDOW,
-    ):
+    )
+    workspace_ok = ratelimit.hit(
+        "link-metadata-workspace",
+        str(request.workspace.pk),
+        settings.LINK_METADATA_RATE_PER_WORKSPACE,
+        settings.LINK_METADATA_RATE_PER_WORKSPACE_WINDOW,
+    )
+    if not (user_ok and workspace_ok):
         return render(
             request,
             "links/partials/metadata.html",
@@ -144,15 +160,20 @@ def metadata(request, slug):
 
     try:
         data = extract_metadata(request.POST.get("destination_url", ""))
-    except ValidationError as error:
-        return render(
-            request, "links/partials/metadata.html", {"error": error.messages[0]}, status=422
-        )
     except Exception:
+        # The failure reason (validation, DNS, connection, timeout, non-HTML, ...)
+        # stays in the log only: the response must not tell a caller which kind of
+        # address probing failed, or the fragment becomes a private-network oracle.
+        logger.info(
+            "metadata lookup failed workspace=%s user=%s",
+            request.workspace.pk,
+            request.user.pk,
+            exc_info=True,
+        )
         return render(
             request,
             "links/partials/metadata.html",
-            {"error": "Could not reach that page. You can still save the link."},
+            {"error": "Could not read that page. You can still save the link."},
             status=422,
         )
     return render(request, "links/partials/metadata.html", data)
