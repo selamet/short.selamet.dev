@@ -64,6 +64,16 @@ docker compose -f compose.yaml -f docker-compose.override.yml up -d --build --re
 
 This repository's own `Deploy` workflow does exactly that over SSH with a key restricted to a forced command, after the `CI` workflow succeeds on `main`. To reuse it, set the `DEPLOY_SSH_KEY`, `DEPLOY_HOST` and `DEPLOY_USER` secrets and the `PUBLIC_URL` variable in your fork.
 
+## Optional: click geography
+
+Clicks can be tagged with a country and city if you point `GEOIP_PATH` at a GeoLite2 City database. This is entirely optional: leave `GEOIP_PATH` unset and the app runs exactly as before, with country and city left blank on every click.
+
+1. Sign up for a free MaxMind account and generate a license key at [maxmind.com](https://www.maxmind.com/en/geolite2/signup).
+2. Download the **GeoLite2 City** database in `.mmdb` format and place it somewhere the container can read, e.g. mounted at `/data/GeoLite2-City.mmdb`.
+3. Set `GEOIP_PATH=/data/GeoLite2-City.mmdb` in `.env` and restart the `web` and `worker` services.
+
+The database is licensed by MaxMind and updated periodically; it is never committed to this repository (`*.mmdb` is gitignored) and you are responsible for keeping your own copy up to date.
+
 ## Notes
 
 - `SECURE_SSL_REDIRECT` is on by default; `/health/` is exempt so plain-HTTP probes from the host keep working.

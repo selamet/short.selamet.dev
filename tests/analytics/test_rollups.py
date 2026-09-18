@@ -32,6 +32,8 @@ def _click(link, **overrides):
         "referrer_host": "",
         "referrer_url": "",
         "target_platform": "desktop",
+        "country": "",
+        "city": "",
         **attribution.utm_from_query_string(""),
     }
     payload.update(overrides)

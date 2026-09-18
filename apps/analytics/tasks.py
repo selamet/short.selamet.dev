@@ -1,7 +1,9 @@
 """Click recording: writes one ClickEvent per served redirect, off the request path.
 
-Geographic resolution (country and city) is deliberately left blank here; GeoLite2
-lookup belongs to the analytics issue that owns that database and its licensing.
+Geographic resolution happens in the view, not here (see apps.redirects.views._record
+and apps.analytics.geo): the raw address never reaches this task, and by the time an
+address has been resolved to a country and city it is no longer needed, so `country`
+and `city` arrive already resolved, as two short strings.
 """
 
 import logging
@@ -46,6 +48,8 @@ def record_click(
     utm_content,
     utm_term,
     target_platform,
+    country,
+    city,
 ):
     """Record one click. Takes `referrer_host`/`referrer_url` and the five UTM values
     already split out of the raw referrer and query string (see
@@ -64,6 +68,8 @@ def record_click(
         return
     string_fields = {
         "ip_hash": ip_hash,
+        "country": country,
+        "city": city,
         "device_type": useragent.device_type(user_agent),
         "os": useragent.operating_system(user_agent),
         "browser": useragent.browser(user_agent),
