@@ -48,6 +48,13 @@ def test_list_shows_active_links_by_default(member_client, links):
     assert "nl-jul" not in body
 
 
+def test_row_copies_the_full_short_url(member_client, links, settings):
+    settings.SITE_URL = "https://sho.rt"
+    first = links[0]
+    body = member_client.get(url("list")).content.decode()
+    assert f'data-copy="https://sho.rt/{first.code}"' in body
+
+
 def test_list_filters_by_status_tag_and_search(member_client, links):
     archived = member_client.get(url("list") + "?status=archived").content.decode()
     assert "nl-jul" in archived and "spring-drop" not in archived

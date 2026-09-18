@@ -182,6 +182,12 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     _require_manage(actor)
     _require_same_workspace(actor, link)
     changed = []
+    # Snapshot of what a fetch (or an earlier override) last stored, taken before the
+    # loop below overwrites it, so an edit form that simply re-submits the same values
+    # it was seeded with does not look like a fresh override (I9).
+    previous_og = {
+        key: getattr(link, key) for key in ("og_title", "og_description", "og_image_url")
+    }
     if destination_url is not None:
         new_destination = destinations.validate_destination(destination_url, check_dns=True)
         if new_destination != link.destination_url:
@@ -206,8 +212,16 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     if "max_clicks" in fields:
         link.max_clicks = fields["max_clicks"]
         changed.append("max_clicks")
-    link.og_overridden = bool(link.og_title or link.og_description or link.og_image_url)
-    changed.append("og_overridden")
+    submitted_og = {key: getattr(link, key) for key in previous_og}
+    if not any(submitted_og.values()):
+        # The user cleared every override field: let the next fetch refill them.
+        link.og_overridden = False
+        changed.append("og_overridden")
+    elif submitted_og != previous_og:
+        # At least one field actually changed from what was last stored: this is a
+        # deliberate override, not just the edit form re-submitting fetched values.
+        link.og_overridden = True
+        changed.append("og_overridden")
     try:
         with transaction.atomic():
             link.save(update_fields=sorted(set(changed)) or None)

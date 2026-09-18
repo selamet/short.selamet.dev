@@ -76,6 +76,14 @@ class Link(models.Model):
     def is_routed(self):
         return self.targets.exists()
 
+    @property
+    def short_url(self):
+        # Local import: `services` imports this module at module load time, so a
+        # top-level import here would be circular.
+        from . import services
+
+        return services.short_url(self)
+
 
 class LinkTarget(models.Model):
     class Platform(models.TextChoices):

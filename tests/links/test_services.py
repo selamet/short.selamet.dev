@@ -254,3 +254,38 @@ def test_obfuscated_ip_literal_destinations_are_rejected_on_save(owner_membershi
     with pytest.raises(ValidationError):
         services.create_link(owner_membership, destination_url="http://2130706433/")
     assert Link.objects.count() == 0
+
+
+def test_update_link_resubmitting_fetched_og_values_does_not_set_the_override(owner_membership):
+    link = services.create_link(owner_membership, destination_url="https://example.com")
+    link.og_title = "Fetched title"
+    link.og_description = "Fetched description"
+    link.og_image_url = "https://cdn.example.com/card.png"
+    link.save()
+    updated = services.update_link(
+        owner_membership,
+        link,
+        og_title="Fetched title",
+        og_description="Fetched description",
+        og_image_url="https://cdn.example.com/card.png",
+    )
+    assert updated.og_overridden is False
+
+
+def test_update_link_changing_an_og_field_sets_the_override(owner_membership):
+    link = services.create_link(owner_membership, destination_url="https://example.com")
+    link.og_title = "Fetched title"
+    link.save()
+    updated = services.update_link(owner_membership, link, og_title="My own title")
+    assert updated.og_overridden is True
+
+
+def test_update_link_clearing_every_og_field_resets_the_override(owner_membership):
+    link = services.create_link(
+        owner_membership, destination_url="https://example.com", og_title="Mine"
+    )
+    assert link.og_overridden is True
+    updated = services.update_link(
+        owner_membership, link, og_title="", og_description="", og_image_url=""
+    )
+    assert updated.og_overridden is False

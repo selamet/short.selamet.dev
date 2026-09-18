@@ -17,7 +17,7 @@
   </div>
   <span class="mono shrink-0 text-ink-muted">{{ link.click_count }} clicks</span>
   <div class="flex shrink-0 items-center gap-2">
-    <button type="button" class="text-ink-muted hover:text-ink" data-copy="{{ SITE_URL }}/{{ link.code }}">Copy</button>
+    <button type="button" class="text-ink-muted hover:text-ink" data-copy="{{ link.short_url }}">Copy</button>
     <a href="{% url 'links:edit' current_workspace.slug link.code %}" class="rounded-md border border-line px-3 py-1.5 font-medium hover:bg-surface-2">Edit</a>
     {% if link.status == "archived" %}
     <form method="post" action="{% url 'links:restore' current_workspace.slug link.code %}"
