@@ -16,7 +16,13 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.analytics import attribution, queries
-from apps.analytics.models import ClickEvent, DailyLinkBreakdown, DailyLinkStat, Dimension
+from apps.analytics.models import (
+    ClickEvent,
+    DailyClickIdentity,
+    DailyLinkBreakdown,
+    DailyLinkStat,
+    Dimension,
+)
 from apps.analytics.tasks import record_click
 from apps.core.privacy import hash_ip
 from apps.links import services as link_services
@@ -51,6 +57,12 @@ def _stat(link, day, clicks, unique_clicks, bot_clicks=0):
         clicks=clicks,
         unique_clicks=unique_clicks,
         bot_clicks=bot_clicks,
+    )
+
+
+def _identity(link, day, identity):
+    DailyClickIdentity.objects.create(
+        link=link, workspace=link.workspace, date=day, identity=identity
     )
 
 
@@ -140,6 +152,17 @@ def dataset(owner):
     _breakdown(link_a2, START + timedelta(days=1), "DE", 4)
     _breakdown(link_b, START, "US", 99999)
 
+    # I3: DailyClickIdentity backs summary()'s workspace-wide unique_clicks.
+    # visitor-1 clicks two different links on two different days -- must still count
+    # once for the workspace, not once per link/day the way summing DailyLinkStat
+    # .unique_clicks across links and days would.
+    _identity(link_a, START, "visitor-1")
+    _identity(link_a2, START + timedelta(days=1), "visitor-1")
+    _identity(link_a, START, "visitor-2")
+    _identity(link_a, END, "visitor-3")
+    # Another workspace's identity: must never be counted for workspace_a.
+    _identity(link_b, START, "visitor-1")
+
     return SimpleNamespace(
         workspace_a=membership_a.workspace,
         workspace_b=membership_b.workspace,
@@ -177,7 +200,9 @@ def test_summary_link_none_aggregates_the_whole_workspace_and_ignores_other_work
     result = queries.summary(dataset.workspace_a, start=START, end=END)
     assert result == {
         "clicks": 26,  # link_a (18) + link_a2 (6-1 + 3-0 = 8)
-        "unique_clicks": 24,  # 17 + (5 + 2)
+        # I3: distinct DailyClickIdentity rows for workspace_a in range, not a sum of
+        # per-link unique_clicks -- visitor-1 clicked two links but counts once.
+        "unique_clicks": 3,  # visitor-1, visitor-2, visitor-3
         "bot_clicks": 4,  # 3 + 1
         "previous_clicks": 12,  # link_a2 has no rows in the previous period
         "delta_pct": 116.7,
@@ -185,12 +210,12 @@ def test_summary_link_none_aggregates_the_whole_workspace_and_ignores_other_work
 
 
 @pytest.mark.django_db
-def test_summary_with_no_previous_clicks_reports_a_flat_100_or_0_percent_delta(dataset):
+def test_summary_with_no_previous_clicks_reports_none_or_zero_delta(dataset):
     no_previous = queries.summary(
         dataset.workspace_a, dataset.link_a, start=END, end=END
     )  # a range with clicks but nothing before PREVIOUS_START in this dataset either
     assert no_previous["previous_clicks"] == 0
-    assert no_previous["delta_pct"] == 100.0
+    assert no_previous["delta_pct"] is None
 
     truly_empty = queries.summary(
         dataset.workspace_a, dataset.link_a, start=date(2020, 1, 1), end=date(2020, 1, 1)
@@ -202,6 +227,35 @@ def test_summary_with_no_previous_clicks_reports_a_flat_100_or_0_percent_delta(d
         "previous_clicks": 0,
         "delta_pct": 0.0,
     }
+
+
+@pytest.mark.django_db
+def test_workspace_unique_clicks_counts_distinct_visitors_not_a_sum_of_per_link_uniques(owner):
+    """I3: one visitor clicking two links in a workspace is two clicks and one unique
+    visitor at the workspace level (not two), and one unique click per link. Goes
+    through record_click (not seeded rollup rows) so query semantics stay bound to
+    what rollups.apply_event actually produces.
+    """
+    membership = _membership(owner, "unique-workspace")
+    link_a = link_services.create_link(
+        membership, destination_url="https://example.com/uw-a", code="uw-link-a"
+    )
+    link_b = link_services.create_link(
+        membership, destination_url="https://example.com/uw-b", code="uw-link-b"
+    )
+    same_visitor = hash_ip("203.0.113.99")
+    today = timezone.localdate()
+    _click(link_a, ip_hash=same_visitor)
+    _click(link_b, ip_hash=same_visitor)
+
+    workspace_summary = queries.summary(membership.workspace, start=today, end=today)
+    assert workspace_summary["clicks"] == 2
+    assert workspace_summary["unique_clicks"] == 1
+
+    per_link_a = queries.summary(membership.workspace, link_a, start=today, end=today)
+    per_link_b = queries.summary(membership.workspace, link_b, start=today, end=today)
+    assert per_link_a["unique_clicks"] == 1
+    assert per_link_b["unique_clicks"] == 1
 
 
 # --- time_series ----------------------------------------------------------------------

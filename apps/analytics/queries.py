@@ -16,6 +16,11 @@ querying the four rollup-backed functions below needs no further timezone
 conversion; only recent_clicks and hour_weekday_matrix convert a raw event's UTC
 occurred_at themselves, since neither has a rollup row to read that conversion off
 of (see _zone).
+
+`summary`'s workspace-wide `unique_clicks` (no `link` given) is the one exception to
+"reads the two rollup tables": DailyLinkStat.unique_clicks is only exact per link, so
+a workspace-wide count instead reads DailyClickIdentity directly (see
+_unique_clicks below).
 """
 
 import zoneinfo
@@ -27,7 +32,7 @@ from django.utils import timezone
 
 from apps.links.models import Link
 
-from .models import ClickEvent, DailyLinkBreakdown, DailyLinkStat
+from .models import ClickEvent, DailyClickIdentity, DailyLinkBreakdown, DailyLinkStat
 
 
 def _zone(workspace):
@@ -80,40 +85,79 @@ def _stat_queryset(workspace, link, start, end):
     return query
 
 
+def _unique_clicks(workspace, link, start, end):
+    """The number of distinct visitors over [start, end].
+
+    For one link, DailyLinkStat.unique_clicks is already exact per day (see
+    rollups._claim_identity), so summing it across the range is still exact: one
+    visitor clicking the same link on three different days within the range is
+    genuinely three of that link's unique clicks.
+
+    With no link, summing those same per-link sums across every link in the
+    workspace would instead count one visitor once for every different link they
+    clicked -- not what "unique visitors" means at the workspace level. This counts
+    distinct DailyClickIdentity rows across the whole workspace instead: `identity`
+    is the same hash for the same visitor regardless of which link they clicked (see
+    rollups._identity), so a plain distinct count over the range gives the true
+    number of visitors active in it, exactly once each no matter how many links or
+    how many of the days in range they clicked on.
+
+    This is exact only as far back as CLICK_EVENT_RETENTION_DAYS: DailyClickIdentity
+    rows are purged on the same schedule as the raw events behind them (see
+    apps.analytics.tasks.purge_click_events), so a range reaching further back than
+    that undercounts by however many identities have already been purged, unlike the
+    per-link path above, which reads DailyLinkStat and is never purged.
+    """
+    if link is not None:
+        return (
+            _stat_queryset(workspace, link, start, end).aggregate(u=Sum("unique_clicks"))["u"] or 0
+        )
+    return (
+        DailyClickIdentity.objects.filter(workspace=workspace, date__gte=start, date__lte=end)
+        .values("identity")
+        .distinct()
+        .count()
+    )
+
+
 def _totals(workspace, link, start, end, include_bots):
     totals = _stat_queryset(workspace, link, start, end).aggregate(
-        clicks=Sum("clicks"), unique_clicks=Sum("unique_clicks"), bot_clicks=Sum("bot_clicks")
+        clicks=Sum("clicks"), bot_clicks=Sum("bot_clicks")
     )
     clicks = totals["clicks"] or 0
-    unique_clicks = totals["unique_clicks"] or 0
     bot_clicks = totals["bot_clicks"] or 0
     if not include_bots:
         clicks -= bot_clicks
-    return clicks, unique_clicks, bot_clicks
+    return clicks, bot_clicks
 
 
 def summary(workspace, link=None, *, start, end, include_bots=False):
     """Totals for [start, end], plus the same total clicks for the immediately
     preceding period of equal length and the percentage change between the two.
 
-    `unique_clicks` always excludes bot clicks, the same way DailyLinkStat's own
-    unique_clicks column does (see rollups._claim_identity): there is no
-    "unique bot click" to include. `include_bots` only controls whether bot_clicks
-    is folded back into `clicks` (and into `previous_clicks`, so the delta compares
-    like with like).
+    `unique_clicks` always excludes bot clicks (a bot click never claims a
+    DailyClickIdentity row or adds to DailyLinkStat.unique_clicks -- see
+    rollups._claim_identity) regardless of `include_bots`, which only controls
+    whether bot_clicks is folded back into `clicks` (and into `previous_clicks`, so
+    the delta compares like with like). With no `link`, `unique_clicks` is bounded by
+    CLICK_EVENT_RETENTION_DAYS -- see _unique_clicks for why and by how much.
 
-    `delta_pct` is 0.0 when both periods have no clicks, and 100.0 when the previous
-    period had none but this one does (a "0 to N" jump has no percentage of its own).
+    `delta_pct` is 0.0 when both periods have no clicks, and None -- not a
+    percentage -- when the previous period had none but this one does: a "0 to N"
+    jump has no percentage change of its own to report.
     """
-    clicks, unique_clicks, bot_clicks = _totals(workspace, link, start, end, include_bots)
+    clicks, bot_clicks = _totals(workspace, link, start, end, include_bots)
+    unique_clicks = _unique_clicks(workspace, link, start, end)
     period_days = (end - start).days + 1
     previous_end = start - timedelta(days=1)
     previous_start = previous_end - timedelta(days=period_days - 1)
-    previous_clicks, _, _ = _totals(workspace, link, previous_start, previous_end, include_bots)
+    previous_clicks, _ = _totals(workspace, link, previous_start, previous_end, include_bots)
     if previous_clicks:
         delta_pct = round((clicks - previous_clicks) / previous_clicks * 100, 1)
+    elif clicks:
+        delta_pct = None
     else:
-        delta_pct = 100.0 if clicks else 0.0
+        delta_pct = 0.0
     return {
         "clicks": clicks,
         "unique_clicks": unique_clicks,
