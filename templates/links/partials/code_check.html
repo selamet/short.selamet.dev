@@ -1,0 +1,9 @@
+{% if state == "empty" %}
+<span class="text-ink-muted">Leave blank to auto-generate a code.</span>
+{% elif state == "available" %}
+<span class="text-ok">✓ {{ code }} {{ message }}</span>
+{% elif state == "taken" %}
+<span class="text-danger" role="alert">{{ code }} {{ message }}</span>
+{% else %}
+<span class="text-danger" role="alert">{{ message }}</span>
+{% endif %}

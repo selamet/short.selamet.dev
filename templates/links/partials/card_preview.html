@@ -1,0 +1,23 @@
+{% firstof platform "whatsapp" as c_platform %}
+{% firstof platform_label "WhatsApp" as c_label %}
+{% firstof og_title form.og_title.value link.og_title "" as c_title %}
+{% firstof og_description form.og_description.value link.og_description "" as c_description %}
+{% firstof og_image_url form.og_image_url.value link.og_image_url "" as c_image_url %}
+{% firstof destination_url form.destination_url.value link.destination_url "" as c_dest %}
+<div class="flex flex-wrap gap-2">
+  {% for key, name in platforms.items %}
+  <button type="button"
+          class="rounded-full border px-3 py-1 text-[11.5px] uppercase tracking-wide {% if key == c_platform %}border-accent text-accent{% else %}border-line hover:bg-surface-2{% endif %}"
+          hx-post="{% url 'links:card_preview' current_workspace.slug %}" hx-vals='{"platform": "{{ key }}"}'
+          hx-include="closest form" hx-target="#card-preview-body" hx-swap="innerHTML">{{ name }}</button>
+  {% endfor %}
+</div>
+<div id="card-preview-body" class="mt-3 max-w-sm overflow-hidden rounded-md border border-line">
+  <p class="border-b border-line bg-surface-2 px-3 py-1 text-[11px] uppercase tracking-wide text-ink-muted">Preview as {{ c_label }}</p>
+  {% if c_image_url %}<div class="h-32 w-full bg-surface-2 bg-cover bg-center" style="background-image:url('{{ c_image_url }}')"></div>{% endif %}
+  <div class="p-3">
+    <p class="font-medium">{{ c_title|default:"Untitled link" }}</p>
+    {% if c_description %}<p class="text-ink-muted">{{ c_description }}</p>{% endif %}
+    <p class="mt-1 text-[11px] uppercase tracking-wide text-ink-muted">{{ c_dest }}</p>
+  </div>
+</div>

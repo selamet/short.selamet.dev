@@ -1,0 +1,47 @@
+{% with enabled=routing_enabled %}
+<label class="flex items-center gap-2">
+  <input type="checkbox" name="routing_enabled" value="on" {% if enabled %}checked{% endif %}
+         hx-post="{% url 'links:routing' current_workspace.slug %}" hx-trigger="change" hx-target="#routing-rows" hx-include="closest form" hx-swap="innerHTML">
+  <span>Route by device</span>
+</label>
+<div id="routing-rows">
+  {% if enabled %}
+  {% firstof values.target_ios_url targets.ios.url "" as ios_url %}
+  {% firstof values.target_ios_app_url targets.ios.app_url "" as ios_app_url %}
+  {% firstof values.target_ios_fallback_url targets.ios.fallback_url "" as ios_fallback_url %}
+  {% firstof values.target_android_url targets.android.url "" as android_url %}
+  {% firstof values.target_android_app_url targets.android.app_url "" as android_app_url %}
+  {% firstof values.target_android_fallback_url targets.android.fallback_url "" as android_fallback_url %}
+  {% firstof values.target_desktop_url targets.desktop.url "" as desktop_url %}
+  {% firstof values.target_desktop_app_url targets.desktop.app_url "" as desktop_app_url %}
+  {% firstof values.target_desktop_fallback_url targets.desktop.fallback_url "" as desktop_fallback_url %}
+  <div class="mt-3 flex flex-col gap-3">
+    <div class="rounded-md border border-line p-3">
+      <p class="font-medium">iOS</p>
+      <div class="mt-2 grid gap-2 sm:grid-cols-3">
+        <input type="text" name="target_ios_url" value="{{ ios_url }}" placeholder="Web URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_ios_app_url" value="{{ ios_app_url }}" placeholder="App scheme (myapp://…)" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_ios_fallback_url" value="{{ ios_fallback_url }}" placeholder="Fallback URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+      </div>
+    </div>
+    <div class="rounded-md border border-line p-3">
+      <p class="font-medium">Android</p>
+      <div class="mt-2 grid gap-2 sm:grid-cols-3">
+        <input type="text" name="target_android_url" value="{{ android_url }}" placeholder="Web URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_android_app_url" value="{{ android_app_url }}" placeholder="App scheme (myapp://…)" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_android_fallback_url" value="{{ android_fallback_url }}" placeholder="Fallback URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+      </div>
+    </div>
+    <div class="rounded-md border border-line p-3">
+      <p class="font-medium">Desktop</p>
+      <div class="mt-2 grid gap-2 sm:grid-cols-3">
+        <input type="text" name="target_desktop_url" value="{{ desktop_url }}" placeholder="Web URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_desktop_app_url" value="{{ desktop_app_url }}" placeholder="App scheme (rarely used)" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        <input type="text" name="target_desktop_fallback_url" value="{{ desktop_fallback_url }}" placeholder="Fallback URL" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+      </div>
+    </div>
+  </div>
+  <p class="mt-3 text-[11.5px] text-ink-muted">Visitor → iOS/Android app when installed, else its fallback URL · Desktop → its web URL.</p>
+  {% endif %}
+</div>
+{% endwith %}

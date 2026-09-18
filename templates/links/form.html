@@ -1,0 +1,153 @@
+{% extends "dashboard/base.html" %}
+{% block title %}{% if link %}Edit {{ link.code }}{% else %}New link{% endif %} · {{ current_workspace.name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<h1 class="text-[20px] font-semibold">{% if link %}Edit link{% else %}New link{% endif %}</h1>
+
+{% if form.errors %}
+<div class="mt-4 rounded-md border border-danger px-4 py-3" role="alert">
+  <p class="font-medium text-danger">Please fix the following:</p>
+  <ul class="mt-1 list-disc pl-5 text-danger">
+    {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+    {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<form method="post" id="link-form" class="mt-6 flex max-w-2xl flex-col gap-6" novalidate
+      action="{% if link %}{% url 'links:edit' current_workspace.slug link.code %}{% else %}{% url 'links:create' current_workspace.slug %}{% endif %}">
+  {% csrf_token %}
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Destination</h2>
+    <label class="mt-3 flex flex-col gap-1">
+      <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Destination URL</span>
+      <div class="flex gap-2">
+        <input type="text" name="destination_url" id="id_destination_url" value="{{ form.destination_url.value|default:'' }}"
+               required placeholder="https://example.com/collections/spring" autofocus
+               class="flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"
+               hx-post="{% url 'links:metadata' current_workspace.slug %}" hx-trigger="change" hx-target="#metadata-result"
+               hx-include="closest form" hx-swap="innerHTML">
+        <button type="button" class="rounded-md border border-line px-3 py-2 font-medium hover:bg-surface-2"
+                hx-post="{% url 'links:metadata' current_workspace.slug %}" hx-target="#metadata-result"
+                hx-include="closest form" hx-swap="innerHTML">Re-fetch</button>
+      </div>
+      {% if form.destination_url.errors %}<span class="text-danger" role="alert">{{ form.destination_url.errors.0 }}</span>{% endif %}
+    </label>
+    <div id="metadata-result" class="mt-2">{% include "links/partials/metadata.html" %}</div>
+  </section>
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Short code</h2>
+    <label class="mt-3 flex flex-col gap-1">
+      <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Short code</span>
+      <div class="flex items-center gap-2">
+        <span class="mono text-ink-muted">{{ SHORT_DOMAIN }}/</span>
+        <input type="text" name="code" id="id_code" value="{{ form.code.value|default:'' }}" placeholder="auto-generated"
+               class="mono flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"
+               hx-get="{% url 'links:code_check' current_workspace.slug %}" hx-trigger="keyup changed delay:300ms"
+               hx-target="#code-check" hx-include="this">
+        <button type="button" id="randomize-code" class="rounded-md border border-line px-3 py-2 font-medium hover:bg-surface-2">Randomize</button>
+      </div>
+      <span id="code-check" class="text-[11.5px]">{% if form.code.errors %}<span class="text-danger" role="alert">{{ form.code.errors.0 }}</span>{% endif %}</span>
+    </label>
+  </section>
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Organize</h2>
+    <label class="mt-3 flex flex-col gap-1">
+      <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Tags</span>
+      <input type="text" name="tags" value="{{ form.tags.value|default:'' }}" placeholder="campaign, ig-bio"
+             class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+      <span class="text-[11.5px] text-ink-muted">Comma-separated.</span>
+      {% if form.tags.errors %}<span class="text-danger" role="alert">{{ form.tags.errors.0 }}</span>{% endif %}
+    </label>
+    <label class="mt-3 flex flex-col gap-1">
+      <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Internal note</span>
+      <textarea name="note" rows="2" placeholder="Only visible to your workspace"
+                class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">{{ form.note.value|default:'' }}</textarea>
+      {% if form.note.errors %}<span class="text-danger" role="alert">{{ form.note.errors.0 }}</span>{% endif %}
+    </label>
+  </section>
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">UTM parameters</h2>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% for key, preset in presets.items %}
+      <button type="button" class="rounded-full border border-line px-3 py-1 text-[11.5px] uppercase tracking-wide hover:bg-surface-2"
+              hx-post="{% url 'links:utm_preset' current_workspace.slug %}" hx-vals='{"preset": "{{ key }}"}'
+              hx-include="closest form" hx-target="#utm-fields" hx-swap="innerHTML">{{ preset.label }}</button>
+      {% endfor %}
+    </div>
+    <div id="utm-fields" class="mt-3">{% include "links/partials/utm_fields.html" %}</div>
+  </section>
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Device routing</h2>
+    <div class="mt-3">{% include "links/partials/routing.html" %}</div>
+  </section>
+
+  <section class="rounded-lg border border-line bg-surface p-5">
+    <h2 class="text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Social card</h2>
+    <div class="mt-3 grid gap-3">
+      <label class="flex flex-col gap-1">
+        <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Title override</span>
+        <input type="text" name="og_title" value="{{ form.og_title.value|default:'' }}"
+               class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        {% if form.og_title.errors %}<span class="text-danger" role="alert">{{ form.og_title.errors.0 }}</span>{% endif %}
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Description override</span>
+        <textarea name="og_description" rows="2"
+                  class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">{{ form.og_description.value|default:'' }}</textarea>
+        {% if form.og_description.errors %}<span class="text-danger" role="alert">{{ form.og_description.errors.0 }}</span>{% endif %}
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Image URL override</span>
+        <input type="text" name="og_image_url" value="{{ form.og_image_url.value|default:'' }}"
+               class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        {% if form.og_image_url.errors %}<span class="text-danger" role="alert">{{ form.og_image_url.errors.0 }}</span>{% endif %}
+      </label>
+    </div>
+    <div class="mt-4" id="card-preview">{% include "links/partials/card_preview.html" %}</div>
+  </section>
+
+  <details class="rounded-lg border border-line bg-surface p-5">
+    <summary class="cursor-pointer text-[13px] font-semibold uppercase tracking-wide text-ink-muted">Advanced</summary>
+    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+      <label class="flex flex-col gap-1">
+        <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Expires at</span>
+        <input type="datetime-local" name="expires_at" value="{{ form.expires_at.value|default:'' }}"
+               class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        {% if form.expires_at.errors %}<span class="text-danger" role="alert">{{ form.expires_at.errors.0 }}</span>{% endif %}
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Click cap</span>
+        <input type="number" name="max_clicks" min="1" value="{{ form.max_clicks.value|default:'' }}"
+               class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+        {% if form.max_clicks.errors %}<span class="text-danger" role="alert">{{ form.max_clicks.errors.0 }}</span>{% endif %}
+      </label>
+    </div>
+  </details>
+
+  <div class="flex items-center gap-3">
+    <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Save link</button>
+    <button type="submit" name="then" value="copy" class="rounded-md border border-line px-4 py-2 font-medium hover:bg-surface-2">Save &amp; copy</button>
+    <a href="{% url 'links:list' current_workspace.slug %}" class="text-ink-muted underline">Cancel</a>
+  </div>
+</form>
+
+<script nonce="{{ csp_nonce }}">
+  (function () {
+    var button = document.getElementById("randomize-code");
+    if (!button) return;
+    var alphabet = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    button.addEventListener("click", function () {
+      var code = "";
+      for (var i = 0; i < 7; i++) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+      var input = document.getElementById("id_code");
+      input.value = code;
+      input.dispatchEvent(new Event("keyup", { bubbles: true }));
+    });
+  })();
+</script>
+{% endblock %}
