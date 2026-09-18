@@ -15,13 +15,17 @@ import pytest
 from django.conf import settings
 from django.utils import timezone
 
-from apps.analytics import queries
+from apps.analytics import attribution, queries
 from apps.analytics.models import ClickEvent, DailyLinkBreakdown, DailyLinkStat, Dimension
+from apps.analytics.tasks import record_click
+from apps.core.privacy import hash_ip
 from apps.links import services as link_services
 from apps.links.models import Link
 from apps.workspaces import services as workspace_services
 from apps.workspaces.models import Membership, Role
 from tests.redirects.conftest import DESKTOP_UA
+
+BOT_UA = "Googlebot/2.1 (+http://www.google.com/bot.html)"
 
 PREVIOUS_START = date(2026, 2, 7)
 PREVIOUS_END = date(2026, 2, 9)
@@ -50,7 +54,7 @@ def _stat(link, day, clicks, unique_clicks, bot_clicks=0):
     )
 
 
-def _breakdown(link, day, value, clicks, dimension=Dimension.COUNTRY):
+def _breakdown(link, day, value, clicks, dimension=Dimension.COUNTRY, bot_clicks=0):
     DailyLinkBreakdown.objects.create(
         link=link,
         workspace=link.workspace,
@@ -58,7 +62,28 @@ def _breakdown(link, day, value, clicks, dimension=Dimension.COUNTRY):
         dimension=dimension,
         value=value,
         clicks=clicks,
+        bot_clicks=bot_clicks,
     )
+
+
+def _click(link, **overrides):
+    """Records one click through record_click, the same task the redirect view
+    enqueues, rather than seeding the rollup tables directly: used by the tests below
+    that need query semantics to stay bound to whatever the write path (and
+    apps.analytics.rollups) actually produces."""
+    payload = {
+        "occurred_at": timezone.now().isoformat(),
+        "ip_hash": hash_ip("203.0.113.1"),
+        "user_agent": DESKTOP_UA,
+        "referrer_host": "",
+        "referrer_url": "",
+        "target_platform": "desktop",
+        "country": "",
+        "city": "",
+        **attribution.utm_from_query_string(""),
+    }
+    payload.update(overrides)
+    record_click.enqueue(link.pk, **payload)
 
 
 def _event(link, occurred_at, **overrides):
@@ -200,6 +225,28 @@ def test_time_series_rejects_an_unsupported_granularity(dataset):
         )
 
 
+@pytest.mark.django_db
+def test_time_series_include_bots_folds_bot_clicks_back_in(dataset):
+    points = queries.time_series(
+        dataset.workspace_a, dataset.link_a, start=START, end=END, include_bots=True
+    )
+    assert points == [
+        {"date": START, "clicks": 14, "unique_clicks": 10},
+        {"date": START + timedelta(days=1), "clicks": 0, "unique_clicks": 0},
+        {"date": END, "clicks": 7, "unique_clicks": 7},
+    ]
+
+
+@pytest.mark.django_db
+def test_time_series_and_summary_agree_over_the_same_window(dataset):
+    # I2: same arithmetic, same default -- summing the daily series must reproduce
+    # summary()'s own totals for the identical window.
+    points = queries.time_series(dataset.workspace_a, dataset.link_a, start=START, end=END)
+    summary = queries.summary(dataset.workspace_a, dataset.link_a, start=START, end=END)
+    assert sum(point["clicks"] for point in points) == summary["clicks"]
+    assert sum(point["unique_clicks"] for point in points) == summary["unique_clicks"]
+
+
 # --- breakdown ------------------------------------------------------------------------
 
 
@@ -234,6 +281,73 @@ def test_breakdown_limit_truncates_the_list_but_shares_stay_against_the_full_tot
 
 
 @pytest.mark.django_db
+def test_breakdown_excludes_bots_by_default_and_include_bots_folds_them_back_in(link):
+    # I1: breakdown() used to include bot clicks unconditionally, disagreeing with
+    # summary()'s default -- a dashboard's total and its own breakdown could
+    # therefore never add up.
+    today = timezone.localdate()
+    _breakdown(link, today, "US", clicks=10, bot_clicks=4)
+    _breakdown(link, today, "TR", clicks=6, bot_clicks=0)
+
+    rows = queries.breakdown(link.workspace, Dimension.COUNTRY, link=link, start=today, end=today)
+    # US and TR tie at 6 net clicks each once US's bots are subtracted; the query's
+    # own tie-break (ORDER BY -clicks, value) then puts them in ascending value order.
+    assert rows == [
+        {"value": "TR", "clicks": 6, "share": 50.0},
+        {"value": "US", "clicks": 6, "share": 50.0},
+    ]
+
+    rows_with_bots = queries.breakdown(
+        link.workspace, Dimension.COUNTRY, link=link, start=today, end=today, include_bots=True
+    )
+    assert rows_with_bots == [
+        {"value": "US", "clicks": 10, "share": 62.5},
+        {"value": "TR", "clicks": 6, "share": 37.5},
+    ]
+
+
+@pytest.mark.django_db
+def test_summary_breakdown_and_leaderboard_agree_on_bot_clicks(owner):
+    """I1: summary() already excluded bot clicks by default; breakdown() and
+    leaderboard() did not, so a dashboard's headline total could disagree with its
+    own breakdown or leaderboard for the exact same range. Goes through record_click
+    (not seeded rollup rows) so this stays bound to what the write path actually
+    produces, not to a hand-built fixture that merely resembles it.
+    """
+    membership = _membership(owner, "bot-consistency")
+    link = link_services.create_link(
+        membership, destination_url="https://example.com/bots", code="bot-link"
+    )
+    today = timezone.localdate()
+    _click(link, ip_hash=hash_ip("203.0.113.10"), country="US")
+    _click(link, ip_hash=hash_ip("203.0.113.11"), country="TR")
+    _click(link, ip_hash=hash_ip("203.0.113.12"), country="US", user_agent=BOT_UA)
+
+    summary = queries.summary(membership.workspace, link, start=today, end=today)
+    breakdown_rows = queries.breakdown(
+        membership.workspace, Dimension.COUNTRY, link, start=today, end=today
+    )
+    leaderboard_rows = queries.leaderboard(membership.workspace, today, today)
+
+    assert summary["clicks"] == 2
+    assert sum(row["clicks"] for row in breakdown_rows) == summary["clicks"]
+    assert leaderboard_rows == [{"code": "bot-link", "title": "", "clicks": 2}]
+
+    summary_with_bots = queries.summary(
+        membership.workspace, link, start=today, end=today, include_bots=True
+    )
+    breakdown_with_bots = queries.breakdown(
+        membership.workspace, Dimension.COUNTRY, link, start=today, end=today, include_bots=True
+    )
+    leaderboard_with_bots = queries.leaderboard(
+        membership.workspace, today, today, include_bots=True
+    )
+    assert summary_with_bots["clicks"] == 3
+    assert sum(row["clicks"] for row in breakdown_with_bots) == summary_with_bots["clicks"]
+    assert leaderboard_with_bots == [{"code": "bot-link", "title": "", "clicks": 3}]
+
+
+@pytest.mark.django_db
 def test_breakdown_limit_is_clamped_to_the_configured_maximum(dataset, settings):
     settings.ANALYTICS_QUERY_MAX_LIMIT = 1
     rows = queries.breakdown(
@@ -249,15 +363,45 @@ def test_breakdown_limit_is_clamped_to_the_configured_maximum(dataset, settings)
 def test_leaderboard_orders_links_by_clicks_and_ignores_other_workspaces(dataset):
     rows = queries.leaderboard(dataset.workspace_a, START, END)
     assert rows == [
-        {"code": "link-a", "title": "Alpha", "clicks": 21},
-        {"code": "link-a2", "title": "Alpha Two", "clicks": 9},
+        {"code": "link-a", "title": "Alpha", "clicks": 18},  # 21 raw - 3 bots
+        {"code": "link-a2", "title": "Alpha Two", "clicks": 8},  # 9 raw - 1 bot
     ]
 
 
 @pytest.mark.django_db
 def test_leaderboard_limit(dataset):
     rows = queries.leaderboard(dataset.workspace_a, START, END, limit=1)
-    assert rows == [{"code": "link-a", "title": "Alpha", "clicks": 21}]
+    assert rows == [{"code": "link-a", "title": "Alpha", "clicks": 18}]
+
+
+@pytest.mark.django_db
+def test_leaderboard_include_bots_folds_bot_clicks_back_in(dataset):
+    # I1: leaderboard() used to include bot clicks unconditionally, the same
+    # inconsistency breakdown() had.
+    rows = queries.leaderboard(dataset.workspace_a, START, END, include_bots=True)
+    assert rows == [
+        {"code": "link-a", "title": "Alpha", "clicks": 21},
+        {"code": "link-a2", "title": "Alpha Two", "clicks": 9},
+    ]
+
+
+@pytest.mark.django_db
+def test_leaderboard_skips_a_link_deleted_between_the_aggregate_and_the_fetch(dataset, monkeypatch):
+    from django.db.models.query import QuerySet
+
+    original_in_bulk = QuerySet.in_bulk
+
+    def in_bulk_after_deleting_link_a2(self, *args, **kwargs):
+        # Simulates dataset.link_a2 being deleted in the gap between leaderboard()'s
+        # aggregate query and its Link.objects.in_bulk() lookup.
+        Link.objects.filter(pk=dataset.link_a2.pk).delete()
+        return original_in_bulk(self, *args, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "in_bulk", in_bulk_after_deleting_link_a2)
+
+    rows = queries.leaderboard(dataset.workspace_a, START, END)
+
+    assert rows == [{"code": "link-a", "title": "Alpha", "clicks": 18}]
 
 
 @pytest.mark.django_db
@@ -324,7 +468,12 @@ def test_recent_clicks_limit_and_workspace_link_mismatch(dataset):
 
 
 @pytest.mark.django_db
-def test_hour_weekday_matrix_shape_and_a_known_peak(dataset):
+def test_hour_weekday_matrix_shape_and_a_known_peak(dataset, settings):
+    # Fixed 2026-03 dates, chosen for their known weekday/hour shape, are long past a
+    # realistic CLICK_EVENT_RETENTION_DAYS by the time this runs; widen it here so the
+    # retention floor added below does not clip this fixture's events (see the
+    # dedicated retention-floor test for that behavior instead).
+    settings.CLICK_EVENT_RETENTION_DAYS = 36500
     # Workspace A is Europe/Istanbul (UTC+3, no DST): times below are chosen so their
     # local hour/weekday differs from their UTC one, proving the conversion actually
     # happens rather than just reading occurred_at's own UTC fields.
@@ -337,6 +486,13 @@ def test_hour_weekday_matrix_shape_and_a_known_peak(dataset):
     # Local date is Mar 9 (after MATRIX_END) -- must be excluded even though it is
     # inside the padded UTC scan window.
     _event(dataset.link_a, occurred_at=datetime(2026, 3, 8, 22, 0, tzinfo=UTC))
+    # A bot click, excluded by default (see the include_bots test below).
+    _event(
+        dataset.link_a,
+        occurred_at=datetime(2026, 3, 2, 6, 0, tzinfo=UTC),
+        is_bot=True,
+        user_agent=BOT_UA,
+    )
 
     matrix = queries.hour_weekday_matrix(
         dataset.workspace_a, dataset.link_a, MATRIX_START, MATRIX_END
@@ -348,6 +504,43 @@ def test_hour_weekday_matrix_shape_and_a_known_peak(dataset):
     assert matrix[0][1] == 1
     assert matrix[2][14] == 1
     assert sum(sum(row) for row in matrix) == 6
+
+
+@pytest.mark.django_db
+def test_hour_weekday_matrix_include_bots_counts_the_bot_click_too(dataset, settings):
+    settings.CLICK_EVENT_RETENTION_DAYS = 36500
+    _event(dataset.link_a, occurred_at=datetime(2026, 3, 2, 6, 0, tzinfo=UTC))  # Mon 09:00 local
+    _event(
+        dataset.link_a,
+        occurred_at=datetime(2026, 3, 2, 6, 0, tzinfo=UTC),
+        is_bot=True,
+        user_agent=BOT_UA,
+    )
+
+    excluding_bots = queries.hour_weekday_matrix(
+        dataset.workspace_a, dataset.link_a, MATRIX_START, MATRIX_END
+    )
+    including_bots = queries.hour_weekday_matrix(
+        dataset.workspace_a, dataset.link_a, MATRIX_START, MATRIX_END, include_bots=True
+    )
+
+    assert excluding_bots[0][9] == 1
+    assert including_bots[0][9] == 2
+
+
+@pytest.mark.django_db
+def test_hour_weekday_matrix_applies_the_same_retention_floor_as_recent_clicks(link, settings):
+    settings.CLICK_EVENT_RETENTION_DAYS = 90
+    now = timezone.now()
+    old = now - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS + 1)
+    recent = now - timedelta(hours=1)
+    _event(link, occurred_at=old)
+    _event(link, occurred_at=recent)
+    today = timezone.localdate()
+
+    matrix = queries.hour_weekday_matrix(link.workspace, link, today - timedelta(days=200), today)
+
+    assert sum(sum(row) for row in matrix) == 1
 
 
 # --- export_rows ------------------------------------------------------------------------

@@ -176,7 +176,7 @@ def apply_event(event):
             DailyLinkBreakdown,
             lookup={"link": event.link, "date": day, "dimension": dimension, "value": value},
             seed={"workspace": event.workspace},
-            deltas={"clicks": 1},
+            deltas={"clicks": 1, "bot_clicks": int(event.is_bot)},
         )
 
 
@@ -239,7 +239,9 @@ def rebuild(link, day):
                     totals["unique_clicks"] += 1
             for dimension, value in dimensions_for(event):
                 key = (dimension, value)
-                breakdown_totals[key] = breakdown_totals.get(key, 0) + 1
+                row = breakdown_totals.setdefault(key, {"clicks": 0, "bot_clicks": 0})
+                row["clicks"] += 1
+                row["bot_clicks"] += int(event.is_bot)
 
         if totals["clicks"]:
             DailyLinkStat.objects.create(link=link, workspace=workspace, date=day, **totals)
@@ -250,9 +252,10 @@ def rebuild(link, day):
                 date=day,
                 dimension=dimension,
                 value=value,
-                clicks=clicks,
+                clicks=row["clicks"],
+                bot_clicks=row["bot_clicks"],
             )
-            for (dimension, value), clicks in breakdown_totals.items()
+            for (dimension, value), row in breakdown_totals.items()
         )
         DailyClickIdentity.objects.bulk_create(
             DailyClickIdentity(link=link, workspace=workspace, date=day, identity=identity)

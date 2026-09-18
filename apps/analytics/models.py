@@ -94,6 +94,7 @@ class DailyLinkBreakdown(models.Model):
     dimension = models.CharField(max_length=20, choices=Dimension.choices)
     value = models.CharField(max_length=255)
     clicks = models.PositiveIntegerField(default=0)
+    bot_clicks = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["-clicks"]
@@ -103,7 +104,13 @@ class DailyLinkBreakdown(models.Model):
                 name="analytics_daily_breakdown_unique",
             )
         ]
-        indexes = [models.Index(fields=["workspace", "date", "dimension"])]
+        # (workspace, dimension, date), not (workspace, date, dimension): every
+        # reader of this table (apps.analytics.queries.breakdown) filters by
+        # workspace and dimension together and only then narrows by date range, so
+        # this ordering lets a single index seek straight into one dimension's rows
+        # before it ever has to consider the date range, instead of scanning every
+        # dimension's rows for the date range first.
+        indexes = [models.Index(fields=["workspace", "dimension", "date"])]
 
     def __str__(self):
         return f"breakdown {self.link_id} @ {self.date} {self.dimension}={self.value}"
@@ -134,7 +141,15 @@ class DailyClickIdentity(models.Model):
                 fields=["link", "date", "identity"], name="analytics_daily_identity_unique"
             )
         ]
-        indexes = [models.Index(fields=["workspace", "date"])]
+        indexes = [
+            models.Index(fields=["workspace", "date"]),
+            # purge_click_events deletes by `date` alone (see
+            # apps.analytics.tasks._delete_in_batches), with no workspace or link in
+            # its filter, so it needs its own index rather than relying on the
+            # (workspace, date) one above, whose leading column that query never
+            # supplies.
+            models.Index(fields=["date"], name="analytics_identity_date_idx"),
+        ]
 
     def __str__(self):
         return f"identity {self.link_id} @ {self.date} {self.identity[:8]}"

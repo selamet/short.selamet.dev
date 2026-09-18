@@ -52,18 +52,21 @@ def _clamp_limit(limit):
     return max(1, min(limit, settings.ANALYTICS_QUERY_MAX_LIMIT))
 
 
-def _padded_utc_window(start, end):
+def padded_utc_window(start, end):
     """The [start, end) range of UTC instants that could contain every event whose
     local date -- under any workspace timezone offset -- falls somewhere in the
     inclusive local-date range [start, end]. Padding a full day on each side covers
     every real-world UTC offset (UTC-12 to UTC+14).
 
-    Shared by hour_weekday_matrix() below and
-    apps.analytics.tasks.rebuild_daily_stats(): both need to scan raw ClickEvent rows
-    by a local, not UTC, date range, and both used to compute this window inline
-    identically; it lives here, in queries.py, because tasks.py can import from
-    queries.py with no cycle (queries.py has no dependency on tasks.py) and this is,
-    at heart, a read concern.
+    Public (no leading underscore): shared by hour_weekday_matrix() below and
+    apps.analytics.tasks.rebuild_daily_stats(), both of which need to scan raw
+    ClickEvent rows by a local, not UTC, date range and both used to compute this
+    window inline identically. It lives here, in queries.py, because tasks.py can
+    import from queries.py with no cycle (queries.py has no dependency on tasks.py)
+    and this is, at heart, a read concern -- but a second module reaching into a
+    name queries.py itself marks private (with the leading underscore this used to
+    have) is exactly the kind of import this codebase otherwise avoids, so the name
+    is public instead.
     """
     window_start = datetime.combine(start - timedelta(days=1), time.min, tzinfo=UTC)
     window_end = datetime.combine(end + timedelta(days=2), time.min, tzinfo=UTC)
@@ -120,10 +123,12 @@ def summary(workspace, link=None, *, start, end, include_bots=False):
     }
 
 
-def time_series(workspace, link=None, *, start, end, granularity="day"):
+def time_series(workspace, link=None, *, start, end, granularity="day", include_bots=False):
     """One point per day between start and end inclusive, zero-filled for any day
-    with no DailyLinkStat row. `clicks` excludes bot clicks, the same default
-    summary() uses; `unique_clicks` always does.
+    with no DailyLinkStat row. `clicks` excludes bot clicks by default, the same
+    default summary() uses and with the same arithmetic (subtracting bot_clicks from
+    the day's total); `include_bots=True` folds them back in. `unique_clicks` never
+    includes bots either way, the same as summary().
 
     `granularity` only accepts "day" for now. The parameter exists so a coarser mode
     (e.g. "week") can be added without changing every caller's signature, but no
@@ -142,18 +147,24 @@ def time_series(workspace, link=None, *, start, end, granularity="day"):
     day = start
     while day <= end:
         row = by_date.get(day)
-        clicks = (row["clicks"] - row["bot_clicks"]) if row else 0
+        if row:
+            clicks = row["clicks"] if include_bots else (row["clicks"] - row["bot_clicks"])
+        else:
+            clicks = 0
         unique_clicks = row["unique_clicks"] if row else 0
         points.append({"date": day, "clicks": clicks, "unique_clicks": unique_clicks})
         day += timedelta(days=1)
     return points
 
 
-def breakdown(workspace, dimension, link=None, *, start, end, limit=10):
+def breakdown(workspace, dimension, link=None, *, start, end, limit=10, include_bots=False):
     """The top `limit` values of one Dimension by total clicks over [start, end],
     each with its share of that dimension's own total over the same range (not of
-    overall traffic) as a percentage rounded to one decimal place. Bot clicks are
-    included, the same as the DailyLinkBreakdown rows themselves.
+    overall traffic) as a percentage rounded to one decimal place.
+
+    Bot clicks are excluded by default, the same default summary() uses, both from
+    each value's own `clicks` and from the total its `share` is computed against;
+    `include_bots=True` folds them back into both.
     """
     limit = _clamp_limit(limit)
     query = DailyLinkBreakdown.objects.filter(
@@ -161,12 +172,11 @@ def breakdown(workspace, dimension, link=None, *, start, end, limit=10):
     )
     if link is not None:
         query = query.filter(link=link)
+    clicks_sum = Sum("clicks") if include_bots else Sum("clicks") - Sum("bot_clicks")
     # Grouped once, unlimited: `share` needs the total across every value in range,
     # not just the ones that make the top `limit`, or a long tail outside the top N
     # would silently inflate the shares shown.
-    grouped = list(
-        query.values("value").annotate(clicks=Sum("clicks")).order_by("-clicks", "value")
-    )
+    grouped = list(query.values("value").annotate(clicks=clicks_sum).order_by("-clicks", "value"))
     total = sum(row["clicks"] for row in grouped)
     return [
         {
@@ -178,9 +188,10 @@ def breakdown(workspace, dimension, link=None, *, start, end, limit=10):
     ]
 
 
-def leaderboard(workspace, start, end, limit=10):
-    """The workspace's top `limit` links by total clicks over [start, end] (bot
-    clicks included, the same as breakdown()). Ties keep the query's own tie-break,
+def leaderboard(workspace, start, end, limit=10, include_bots=False):
+    """The workspace's top `limit` links by total clicks over [start, end]. Bot
+    clicks are excluded by default, the same default summary() and breakdown() use;
+    `include_bots=True` folds them back in. Ties keep the query's own tie-break,
     ascending link id, so the order is deterministic and stable across calls.
 
     `rows` (below) already comes back in exactly that order, from ORDER BY -clicks,
@@ -190,23 +201,27 @@ def leaderboard(workspace, start, end, limit=10):
     different (or no) tie-break, against a queryset whose own default ordering
     (Link.Meta: "-created_at") has nothing to do with clicks, previously could and
     did disagree with the SQL order on a tie.
+
+    A link deleted between the aggregate above and the in_bulk() lookup below is
+    skipped rather than raising KeyError: the aggregate is already stale the moment
+    that happens, and the rest of the leaderboard is still worth returning.
     """
     limit = _clamp_limit(limit)
+    clicks_sum = Sum("clicks") if include_bots else Sum("clicks") - Sum("bot_clicks")
     rows = list(
         DailyLinkStat.objects.filter(workspace=workspace, date__gte=start, date__lte=end)
         .values("link_id")
-        .annotate(clicks=Sum("clicks"))
+        .annotate(clicks=clicks_sum)
         .order_by("-clicks", "link_id")[:limit]
     )
     links_by_id = Link.objects.only("pk", "code", "title").in_bulk(row["link_id"] for row in rows)
-    return [
-        {
-            "code": links_by_id[row["link_id"]].code,
-            "title": links_by_id[row["link_id"]].title,
-            "clicks": row["clicks"],
-        }
-        for row in rows
-    ]
+    result = []
+    for row in rows:
+        link_obj = links_by_id.get(row["link_id"])
+        if link_obj is None:
+            continue
+        result.append({"code": link_obj.code, "title": link_obj.title, "clicks": row["clicks"]})
+    return result
 
 
 def recent_clicks(workspace, link, limit=20):
@@ -234,23 +249,33 @@ def recent_clicks(workspace, link, limit=20):
     ]
 
 
-def hour_weekday_matrix(workspace, link, start, end):
+def hour_weekday_matrix(workspace, link, start, end, include_bots=False):
     """A 7x24 matrix (rows: local weekday, 0=Monday..6=Sunday; columns: local
-    hour-of-day, 0-23) of click counts for one link over [start, end].
+    hour-of-day, 0-23) of click counts for one link over [start, end]. Bot clicks are
+    excluded by default, the same default every other function here uses, by
+    filtering on `is_bot`; `include_bots=True` includes them.
 
-    Raw ClickEvent rows are queried in a UTC window from _padded_utc_window(), wide
+    Raw ClickEvent rows are queried in a UTC window from padded_utc_window(), wide
     enough to catch every event whose local day could fall in [start, end] under any
     timezone offset; each candidate is then converted with _zone() and only kept if
     its local date actually lands in range -- the same two-step
     apps.analytics.tasks.rebuild_daily_stats() uses for the same reason (and the
-    same window helper).
+    same window helper). That window is also floored at CLICK_EVENT_RETENTION_DAYS,
+    the same floor recent_clicks() applies: a raw ClickEvent this old has already
+    been purged (or is about to be), so a `start` reaching further back than that is
+    bounded rather than scanning a range that can never return anything for it.
     """
     zone = _zone(workspace)
-    window_start, window_end = _padded_utc_window(start, end)
+    window_start, window_end = padded_utc_window(start, end)
+    retention_floor = timezone.now() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
+    window_start = max(window_start, retention_floor)
     matrix = [[0] * 24 for _ in range(7)]
     events = ClickEvent.objects.filter(
         workspace=workspace, link=link, occurred_at__gte=window_start, occurred_at__lt=window_end
-    ).only("occurred_at", "link_id", "workspace_id")
+    )
+    if not include_bots:
+        events = events.filter(is_bot=False)
+    events = events.only("occurred_at", "link_id", "workspace_id")
     for event in events.iterator():
         local = event.occurred_at.astimezone(zone)
         if start <= local.date() <= end:

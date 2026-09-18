@@ -22,7 +22,7 @@ from apps.links.models import Link
 
 from . import rollups, useragent
 from .models import ClickEvent, DailyClickIdentity
-from .queries import _padded_utc_window
+from .queries import padded_utc_window
 
 logger = logging.getLogger(__name__)
 
@@ -159,12 +159,12 @@ def rebuild_daily_stats(day=None):
     ClickEvent rows actually fall on `day` differs link by link. Rather than
     duplicating that per-workspace conversion here, this scans every event in a
     window wide enough to cover any timezone offset (see
-    apps.analytics.queries._padded_utc_window, shared with hour_weekday_matrix()
+    apps.analytics.queries.padded_utc_window, shared with hour_weekday_matrix()
     there) and asks rollups.local_date() -- the same function apply_event() itself
     uses -- which day each one lands on.
     """
     day = _coerce_day(day) or (timezone.now().date() - timedelta(days=1))
-    window_start, window_end = _padded_utc_window(day, day)
+    window_start, window_end = padded_utc_window(day, day)
     candidates = ClickEvent.objects.filter(
         occurred_at__gte=window_start, occurred_at__lt=window_end
     ).select_related("workspace")
