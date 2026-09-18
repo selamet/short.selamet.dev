@@ -5,6 +5,7 @@ DNS can change between the two.
 """
 
 import ipaddress
+import re
 import socket
 from urllib.parse import urlsplit, urlunsplit
 
@@ -12,6 +13,12 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 
 ALLOWED_SCHEMES = {"http", "https"}
+
+# Schemes an app-link target must never use, checked after control characters are
+# stripped (see `validate_app_url`).
+DENIED_APP_SCHEMES = {"javascript", "data", "vbscript", "blob", "file", "about"}
+_APP_SCHEME_RE = re.compile(r"^([a-z][a-z0-9+.-]*):", re.IGNORECASE)
+_CONTROL_CHARS_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def _normalize_host(host):
@@ -96,3 +103,23 @@ def validate_destination(url, check_dns=False):
         raise ValidationError("Private and local addresses cannot be used as destinations.")
     netloc = _rebuild_netloc(parts, host)
     return urlunsplit((parts.scheme.lower(), netloc, parts.path, parts.query, parts.fragment))
+
+
+def validate_app_url(value, check_dns=False):
+    """Validate a custom-scheme app-link target (e.g. "instagram://user?username=acme").
+
+    Browsers strip embedded control characters (tabs, newlines, ...) from a URL before
+    parsing its scheme, so "java\\nscript:alert(1)" is not a syntax error to them, it is
+    "javascript:alert(1)". Strip the same characters here before the scheme is read, or
+    a control character could smuggle a denied scheme past a naive check.
+    """
+    cleaned = _CONTROL_CHARS_RE.sub("", (value or "")).strip()
+    match = _APP_SCHEME_RE.match(cleaned)
+    if not match:
+        raise ValidationError("Enter a valid app link, e.g. instagram://user?username=acme.")
+    scheme = match.group(1).lower()
+    if scheme in DENIED_APP_SCHEMES:
+        raise ValidationError("This app scheme is not allowed.")
+    if scheme in ALLOWED_SCHEMES:
+        return validate_destination(cleaned, check_dns=check_dns)
+    return cleaned

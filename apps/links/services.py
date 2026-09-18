@@ -106,6 +106,8 @@ def set_targets(actor, link, rows):
             continue
         if url:
             url = destinations.validate_destination(url)
+        if app_url:
+            app_url = destinations.validate_app_url(app_url)
         if app_url and not fallback_url:
             raise ValidationError("An app scheme needs a web fallback URL.")
         if fallback_url:

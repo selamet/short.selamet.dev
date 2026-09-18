@@ -67,3 +67,39 @@ def test_is_blocked_host_matches_across_unicode_and_punycode(settings):
     assert destinations.is_blocked_host("xn--caf-dma.example") is True
     settings.BLOCKED_LINK_DOMAINS = ["xn--caf-dma.example"]
     assert destinations.is_blocked_host("café.example") is True
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "javascript:alert(1)",
+        "data:text/html,hi",
+        "vbscript:msgbox(1)",
+        "blob:https://example.com/x",
+        "file:///etc/passwd",
+        "about:blank",
+        "JAVASCRIPT:alert(1)",
+    ],
+)
+def test_validate_app_url_rejects_denied_schemes(url):
+    with pytest.raises(ValidationError):
+        destinations.validate_app_url(url)
+
+
+def test_validate_app_url_accepts_a_custom_scheme():
+    value = "instagram://user?username=acme"
+    assert destinations.validate_app_url(value) == value
+
+
+def test_validate_app_url_validates_an_http_target_like_a_destination(settings):
+    settings.SHORT_DOMAIN = "sho.rt"
+    assert destinations.validate_app_url("https://Example.com/x") == "https://example.com/x"
+    with pytest.raises(ValidationError):
+        destinations.validate_app_url("http://127.0.0.1/x")
+
+
+def test_validate_app_url_rejects_a_scheme_smuggled_via_control_characters():
+    with pytest.raises(ValidationError):
+        destinations.validate_app_url("java\nscript:alert(1)")
+    with pytest.raises(ValidationError):
+        destinations.validate_app_url("java\tscript:alert(1)")
