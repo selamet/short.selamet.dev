@@ -52,6 +52,29 @@ def test_a_database_outage_returns_503(client, monkeypatch):
 
 
 @pytest.mark.django_db
+def test_any_other_exception_from_the_resolver_also_returns_503(client, monkeypatch, caplog):
+    def boom(*args, **kwargs):
+        raise RuntimeError("something unrelated to the database broke")
+
+    monkeypatch.setattr("apps.redirects.resolver._payload_for", boom)
+    response = client.get("/spring-drop", HTTP_USER_AGENT=DESKTOP_UA)
+    assert response.status_code == 503
+    assert response["Retry-After"] == "5"
+    assert "unexpected error" in caplog.text
+
+
+@pytest.mark.django_db
+def test_an_exception_from_the_resolver_makes_the_preview_page_answer_503_too(client, monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("apps.redirects.resolver._payload_for", boom)
+    response = client.get("/spring-drop+", HTTP_USER_AGENT=DESKTOP_UA)
+    assert response.status_code == 503
+    assert response["Retry-After"] == "5"
+
+
+@pytest.mark.django_db
 def test_an_ordinary_dashboard_page_still_carries_its_csp_header(client, db):
     """RedirectMiddleware sits right after ContentSecurityPolicyMiddleware now; a page
     that never touches the redirect path at all must keep getting its header."""

@@ -32,6 +32,28 @@ def _error_page(request, template, status):
     return _no_store(render(request, template, status=status))
 
 
+def _unavailable(request):
+    response = _error_page(request, "redirects/errors/unavailable.html", 503)
+    response["Retry-After"] = "5"
+    return response
+
+
+def _resolve_or_error(request, code, user_agent):
+    """Resolve a code, catching anything the resolver can raise rather than just
+    DatabaseError: a redirect is worth more than the click and OG data it serves, so
+    any failure here should still answer with a 503 and log, not crash. Returns
+    `(resolution, None)` on success or `(None, error_response)` on failure.
+    """
+    try:
+        return resolver.resolve(code, user_agent), None
+    except DatabaseError:
+        logger.exception("database unavailable while resolving %s", code)
+        return None, _unavailable(request)
+    except Exception:
+        logger.exception("unexpected error while resolving %s", code)
+        return None, _unavailable(request)
+
+
 def _record(request, resolution):
     # Split here, not in the task: the production task backend persists its arguments
     # to the database, and the raw referrer (which can carry credentials in its
@@ -60,13 +82,9 @@ def _record(request, resolution):
 
 def redirect_view(request, code):
     user_agent = request.META.get("HTTP_USER_AGENT", "")
-    try:
-        resolution = resolver.resolve(code, user_agent)
-    except DatabaseError:
-        logger.exception("database unavailable while resolving %s", code)
-        response = _error_page(request, "redirects/errors/unavailable.html", 503)
-        response["Retry-After"] = "5"
-        return response
+    resolution, error = _resolve_or_error(request, code, user_agent)
+    if error is not None:
+        return error
     if resolution is None:
         return _error_page(request, "redirects/errors/not_found.html", 404)
     if resolution.status != Link.Status.ACTIVE:
@@ -88,7 +106,9 @@ def redirect_view(request, code):
 
 
 def preview(request, code):
-    resolution = resolver.resolve(code, request.META.get("HTTP_USER_AGENT", ""))
+    resolution, error = _resolve_or_error(request, code, request.META.get("HTTP_USER_AGENT", ""))
+    if error is not None:
+        return error
     if resolution is None:
         return _error_page(request, "redirects/errors/not_found.html", 404)
     if resolution.status != Link.Status.ACTIVE:
