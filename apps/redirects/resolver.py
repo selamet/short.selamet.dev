@@ -94,7 +94,7 @@ def _payload_for(code):
     return payload
 
 
-def _is_expired(payload):
+def _is_expired(code, payload):
     # A malformed expires_at (wrong type, unparsable string) or a naive one (no
     # timezone, which makes the comparison below raise TypeError under USE_TZ) is
     # treated as not expired rather than raising: whatever produced it, that is not
@@ -107,7 +107,18 @@ def _is_expired(payload):
         except (TypeError, ValueError):
             pass
     max_clicks = payload.get("max_clicks")
-    return bool(max_clicks and payload.get("click_count", 0) >= max_clicks)
+    if not max_clicks:
+        return False
+    # max_clicks is a soft cap, not a hard one: the counter this reads lags the
+    # redirect it is about to let through by design (bump_click_count runs from the
+    # click task, after this resolve() call returns), so a short burst of concurrent
+    # requests can all see a count under the cap and all be let through before it
+    # catches up. Good enough for "stop serving after roughly N clicks", not a
+    # guarantee of exactly N.
+    click_count = redirect_cache.get_click_count(code)
+    if click_count is None:
+        click_count = payload.get("click_count", 0)
+    return click_count >= max_clicks
 
 
 def choose_target(payload, platform):
@@ -140,6 +151,6 @@ def resolve(code, user_agent):
         platform=platform,
         app_url=target.get("app_url", ""),
         fallback_url=fallback_url,
-        expired=_is_expired(payload),
+        expired=_is_expired(code, payload),
         og=payload.get("og") or {},
     )

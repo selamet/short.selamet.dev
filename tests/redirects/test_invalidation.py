@@ -51,6 +51,20 @@ def test_archiving_and_restoring_invalidate(membership, link, django_capture_on_
 
 
 @pytest.mark.django_db
+def test_a_click_landing_after_an_edit_does_not_resurrect_the_old_payload(
+    membership, link, django_capture_on_commit_callbacks
+):
+    resolver.resolve(link.code, DESKTOP_UA)
+    with django_capture_on_commit_callbacks(execute=True):
+        link_services.update_link(membership, link, destination_url="https://example.com/new")
+    assert redirect_cache.get_payload(link.code) is None
+    # A click enqueued just before the edit lands after it; bumping the counter must
+    # not bring the invalidated payload back.
+    redirect_cache.bump_click_count(link.code, seed=link.click_count)
+    assert redirect_cache.get_payload(link.code) is None
+
+
+@pytest.mark.django_db
 def test_changing_targets_or_tags_invalidates(membership, link, django_capture_on_commit_callbacks):
     resolver.resolve(link.code, DESKTOP_UA)
     with django_capture_on_commit_callbacks(execute=True):

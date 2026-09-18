@@ -121,12 +121,33 @@ def test_platform_fields_come_from_the_user_agent(link):
 
 
 @pytest.mark.django_db
-def test_recording_refreshes_the_cached_click_count(link):
+def test_recording_bumps_the_click_count_in_its_own_cache_key(link):
     from apps.redirects import resolver
 
     resolver.resolve(link.code, DESKTOP_UA)
     _record(link)
-    assert redirect_cache.get_payload(link.code)["click_count"] == 1
+    # The counter lives outside the cached payload entirely now (see I2): the payload
+    # snapshot from before this click is untouched, and the counter is what moved.
+    assert redirect_cache.get_payload(link.code)["click_count"] == 0
+    assert redirect_cache.get_click_count(link.code) == 1
+
+
+@pytest.mark.django_db
+def test_a_failure_updating_the_counter_rolls_back_the_event_too(link, monkeypatch):
+    # The immediate task backend used in tests logs a task failure rather than
+    # propagating it to the caller, so this asserts on the resulting database state
+    # instead of an exception: without transaction.atomic() around the write, the
+    # ClickEvent below would survive even though the counter update after it failed.
+    from apps.analytics import tasks as analytics_tasks
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(analytics_tasks, "F", boom)
+    _record(link)
+    assert ClickEvent.objects.count() == 0
+    link.refresh_from_db()
+    assert link.click_count == 0
 
 
 @pytest.mark.django_db

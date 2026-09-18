@@ -6,6 +6,7 @@ lookup belongs to the analytics issue that owns that database and its licensing.
 
 import logging
 
+from django.db import transaction
 from django.db.models import F
 from django.tasks import task
 from django.utils.dateparse import parse_datetime
@@ -51,6 +52,10 @@ def record_click(
     `apps.analytics.attribution`), never the raw values themselves: the production
     task backend persists its arguments to the database, and credentials or an
     unbounded query string must never reach that table.
+
+    Not idempotent against a retried task: a redelivered call would write a second
+    ClickEvent and double-count. Deferred, because the database backend in use here
+    does not retry a task today; worth revisiting if that changes.
     """
     try:
         link = Link.objects.get(pk=link_id)
@@ -72,16 +77,20 @@ def record_click(
         "utm_content": utm_content,
         "utm_term": utm_term,
     }
-    ClickEvent.objects.create(
-        link=link,
-        occurred_at=parse_datetime(occurred_at),
-        is_bot=useragent.is_bot(user_agent),
-        **{name: _truncated(name, value) for name, value in string_fields.items()},
-    )
-    Link.objects.filter(pk=link_id).update(click_count=F("click_count") + 1)
+    # The event write and the counter update land together or not at all; the cache
+    # increment happens after, outside the transaction, since it is best-effort and a
+    # cache outage must never roll back a successful write.
+    with transaction.atomic():
+        ClickEvent.objects.create(
+            link=link,
+            occurred_at=parse_datetime(occurred_at),
+            is_bot=useragent.is_bot(user_agent),
+            **{name: _truncated(name, value) for name, value in string_fields.items()},
+        )
+        Link.objects.filter(pk=link_id).update(click_count=F("click_count") + 1)
     # Imported lazily to keep the app dependency one-directional: apps.redirects
     # already imports apps.analytics.tasks (to enqueue this very task), so a
     # module-level import here would be circular.
     from apps.redirects import cache as redirect_cache
 
-    redirect_cache.bump_click_count(link.code)
+    redirect_cache.bump_click_count(link.code, seed=link.click_count)

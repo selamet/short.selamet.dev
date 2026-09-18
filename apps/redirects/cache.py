@@ -27,6 +27,10 @@ def key_for(code):
     return f"link:{CACHE_VERSION}:{code}"
 
 
+def clicks_key_for(code):
+    return f"{key_for(code)}:clicks"
+
+
 def payload_from_link(link):
     return {
         "id": link.pk,
@@ -87,16 +91,55 @@ def invalidate(code):
         logger.warning("cache unavailable while invalidating %s", code, exc_info=True)
 
 
-def bump_click_count(code):
-    """Nudge a cached payload's click_count by one so the resolver's expiry check sees
-    a click that just happened without waiting for the entry to expire and reload from
-    PostgreSQL. A no-op when nothing is cached for this code, including a cached miss.
-
-    Reads and writes go through get_payload/set_payload, so a cache outage is already
-    swallowed there and never raises here either.
+def get_click_count(code):
+    """The atomically incremented click counter for a code, kept in its own key
+    entirely outside the cached payload (see bump_click_count). None when nothing is
+    cached for it: a cache outage, or no click has bumped it since the payload was
+    last (re)cached, in which case the caller falls back to the payload's own
+    click_count.
     """
-    payload = get_payload(code)
-    if payload is None or payload == MISS:
-        return
-    payload["click_count"] = payload.get("click_count", 0) + 1
-    set_payload(code, payload)
+    try:
+        return cache.get(clicks_key_for(code))
+    except Exception:
+        logger.warning(
+            "cache unavailable while reading the click count for %s", code, exc_info=True
+        )
+        return None
+
+
+def bump_click_count(code, seed):
+    """Atomically increment the click counter kept outside the cached payload by one.
+
+    Deliberately never reads or writes the payload itself: the previous version nudged
+    click_count inside the cached payload on every click, which could rewrite a stale
+    payload with a fresh TTL right after an edit had invalidated it, resurrecting data
+    the edit meant to throw away. Counting in a separate key removes that interaction
+    entirely, and using cache.incr makes the count itself atomic against concurrent
+    clicks (the previous read-modify-write on the payload could lose increments under
+    concurrency; this cannot).
+
+    `seed` is the database's click_count from just before this click, used to prime
+    the counter the first time it is touched after a cache miss (an edit's
+    invalidation, a cold cache, an eviction) so it picks up where PostgreSQL left off
+    instead of restarting at zero. `cache.add` is a no-op once the key exists, so
+    `seed` is ignored on every call after the first.
+    """
+    key = clicks_key_for(code)
+    try:
+        cache.add(key, seed, timeout=settings.REDIRECT_CACHE_TTL)
+        return cache.incr(key)
+    except ValueError:
+        # The key expired between add and incr; retry once with a fresh seed.
+        try:
+            cache.add(key, seed, timeout=settings.REDIRECT_CACHE_TTL)
+            return cache.incr(key)
+        except Exception:
+            logger.warning(
+                "cache unavailable while bumping the click count for %s", code, exc_info=True
+            )
+            return None
+    except Exception:
+        logger.warning(
+            "cache unavailable while bumping the click count for %s", code, exc_info=True
+        )
+        return None

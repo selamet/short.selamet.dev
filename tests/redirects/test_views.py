@@ -49,6 +49,20 @@ def test_expired_link_renders_the_expired_page(membership):
 
 
 @pytest.mark.django_db
+def test_the_second_click_is_refused_when_max_clicks_is_one(membership):
+    link = link_services.create_link(
+        membership,
+        destination_url="https://example.com/capped",
+        code="one-click",
+        max_clicks=1,
+    )
+    first = client_get(link.code)
+    assert first.status_code == 302
+    second = client_get(link.code)
+    assert second.status_code == 410
+
+
+@pytest.mark.django_db
 def test_disabled_and_archived_links_render_the_disabled_page(membership, link):
     link_services.archive_link(membership, link)
     response = client_get(link.code)

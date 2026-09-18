@@ -47,3 +47,26 @@ def test_get_payload_survives_a_broken_cache(link, monkeypatch, caplog):
     monkeypatch.setattr(cache, "get", boom)
     assert redirect_cache.get_payload(link.code) is None
     assert "cache unavailable" in caplog.text
+
+
+def test_bump_click_count_increments_atomically_and_seeds_once(link):
+    first = redirect_cache.bump_click_count(link.code, seed=0)
+    second = redirect_cache.bump_click_count(link.code, seed=0)
+    assert (first, second) == (1, 2)
+
+
+def test_bump_click_count_seeds_from_the_database_value_on_first_use(link):
+    bumped = redirect_cache.bump_click_count(link.code, seed=41)
+    assert bumped == 42
+    assert redirect_cache.get_click_count(link.code) == 42
+
+
+def test_bump_click_count_never_touches_the_payload(link):
+    payload = redirect_cache.payload_from_link(link)
+    redirect_cache.set_payload(link.code, payload)
+    redirect_cache.bump_click_count(link.code, seed=0)
+    assert redirect_cache.get_payload(link.code) == payload
+
+
+def test_get_click_count_is_none_when_nothing_has_bumped_it(db):
+    assert redirect_cache.get_click_count("never-clicked") is None

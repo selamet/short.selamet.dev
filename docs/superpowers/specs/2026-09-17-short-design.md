@@ -79,7 +79,7 @@ Rules:
 - `ApiKey`: `workspace`, `name`, `prefix` (first 8 chars, shown in lists), `key_hash`, `last_used_at`, `revoked_at`, `created_by`, `created_at`.
 
 ### links
-- `Link`: `workspace`, `code` (unique; 7-char base62 by default or custom slug), `destination_url`, `title`, `favicon_url`, `note`, `status` ∈ {active, disabled, archived}, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `og_title`, `og_description`, `og_image` (file or URL), `og_fetched_at`, `expires_at`, `max_clicks`, `click_count` (denormalized, updated by task), `created_by`, `created_at`, `updated_at`.
+- `Link`: `workspace`, `code` (unique; 7-char base62 by default or custom slug), `destination_url`, `title`, `favicon_url`, `note`, `status` ∈ {active, disabled, archived}, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `og_title`, `og_description`, `og_image` (file or URL), `og_fetched_at`, `expires_at`, `max_clicks` (a soft cap: the redirect path checks it against a click counter that lags the redirect by design, so a burst of concurrent clicks can land slightly over it), `click_count` (denormalized, updated by task), `created_by`, `created_at`, `updated_at`.
 - `LinkTarget`: `link`, `platform` ∈ {ios, android, desktop}, `url`, `app_url` (deep link, optional), `fallback_url`; unique (link, platform). No rows when device routing is off.
 - `Tag`: `workspace`, `name`, `color`; unique (workspace, name). `Link.tags` M2M.
 - `ImportJob`: `workspace`, `file`, `status`, `total_rows`, `processed_rows`, `errors` (JSON), `created_by`, timestamps.
