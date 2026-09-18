@@ -105,13 +105,13 @@ def set_targets(actor, link, rows):
         if not url and not app_url:
             continue
         if url:
-            url = destinations.validate_destination(url)
+            url = destinations.validate_destination(url, check_dns=True)
         if app_url:
-            app_url = destinations.validate_app_url(app_url)
+            app_url = destinations.validate_app_url(app_url, check_dns=True)
         if app_url and not fallback_url:
             raise ValidationError("An app scheme needs a web fallback URL.")
         if fallback_url:
-            fallback_url = destinations.validate_destination(fallback_url)
+            fallback_url = destinations.validate_destination(fallback_url, check_dns=True)
         cleaned.append(
             {"platform": platform, "url": url, "app_url": app_url, "fallback_url": fallback_url}
         )
@@ -140,7 +140,10 @@ def _check_rate_limits(actor):
 
 def create_link(actor, destination_url, code="", tags=None, targets=None, **fields):
     _require_manage(actor)
-    destination_url = destinations.validate_destination(destination_url)
+    destination_url = destinations.validate_destination(destination_url, check_dns=True)
+    og_image_url = (fields.get("og_image_url") or "").strip()
+    if og_image_url:
+        fields["og_image_url"] = destinations.validate_destination(og_image_url, check_dns=True)
     _check_rate_limits(actor)
     code = _resolve_code(code)
     values = {key: (fields.get(key) or "") for key in EDITABLE_FIELDS if key != "destination_url"}
@@ -180,7 +183,7 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     _require_same_workspace(actor, link)
     changed = []
     if destination_url is not None:
-        new_destination = destinations.validate_destination(destination_url)
+        new_destination = destinations.validate_destination(destination_url, check_dns=True)
         if new_destination != link.destination_url:
             link.destination_url = new_destination
             link.og_fetched_at = None
@@ -191,7 +194,10 @@ def update_link(actor, link, destination_url=None, code=None, tags=None, targets
     for key in EDITABLE_FIELDS:
         if key == "destination_url" or key not in fields:
             continue
-        setattr(link, key, fields.get(key) or "")
+        value = fields.get(key) or ""
+        if key == "og_image_url" and value:
+            value = destinations.validate_destination(value, check_dns=True)
+        setattr(link, key, value)
         changed.append(key)
     if "expires_at" in fields:
         link.expires_at = fields["expires_at"]

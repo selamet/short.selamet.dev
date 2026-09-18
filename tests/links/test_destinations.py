@@ -139,3 +139,47 @@ def test_validate_app_url_rejects_a_scheme_smuggled_via_control_characters():
         destinations.validate_app_url("java\nscript:alert(1)")
     with pytest.raises(ValidationError):
         destinations.validate_app_url("java\tscript:alert(1)")
+
+
+@pytest.mark.parametrize("url", ["http://example.com:99999/", "http://example.com:abc/"])
+def test_validate_destination_turns_a_malformed_port_into_a_validation_error(url):
+    with pytest.raises(ValidationError):
+        destinations.validate_destination(url)
+
+
+def test_validate_destination_strips_userinfo(settings):
+    settings.SHORT_DOMAIN = "sho.rt"
+    assert (
+        destinations.validate_destination("https://example.com\\@evil.example/")
+        == "https://evil.example/"
+    )
+    assert destinations.validate_destination("https://user:pass@example.com/x") == (
+        "https://example.com/x"
+    )
+
+
+@pytest.mark.parametrize("host", ["2130706433", "0x7f.0.0.1", "127.1"])
+def test_validate_destination_resolves_obfuscated_ip_literals_on_save(host):
+    # These are not recognized as IP literals by `ipaddress`, only by the resolver
+    # (glibc's getaddrinfo accepts the old inet_aton-style forms), which is exactly why
+    # DNS re-validation at save time (I6) is needed to catch them. No mocking here: this
+    # is a local, numeric resolution, not a network lookup.
+    with pytest.raises(ValidationError):
+        destinations.validate_destination(f"http://{host}/", check_dns=True)
+
+
+def test_validate_destination_accepts_a_normal_public_host_with_dns_enabled(monkeypatch):
+    monkeypatch.setattr(destinations, "resolve_host", lambda host, timeout: [FAKE_PUBLIC_ADDRESS])
+    assert (
+        destinations.validate_destination("https://example.com/x", check_dns=True)
+        == "https://example.com/x"
+    )
+
+
+def test_validate_destination_turns_a_resolution_failure_into_a_validation_error(monkeypatch):
+    def boom(host, timeout):
+        raise ValidationError("Could not resolve that host.")
+
+    monkeypatch.setattr(destinations, "resolve_host", boom)
+    with pytest.raises(ValidationError):
+        destinations.validate_destination("https://example.com/x", check_dns=True)

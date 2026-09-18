@@ -85,15 +85,15 @@ def resolve_host(host, timeout):
 
 
 def _rebuild_netloc(parts, host):
-    """Re-assemble netloc from the normalized host, keeping any port and userinfo."""
+    """Re-assemble netloc from the normalized host and port, dropping any userinfo.
+
+    A rebuilt "user@host" netloc can be parsed differently by another URL parser than
+    it was by `urlsplit` here (e.g. "https://example.com\\@evil.com/" is validated
+    against the host "evil.com" but a naive parser downstream could read "example.com"
+    instead), so userinfo never survives into the stored/returned URL.
+    """
     netloc_host = f"[{host}]" if ":" in host else host
-    netloc = netloc_host if parts.port is None else f"{netloc_host}:{parts.port}"
-    if parts.username:
-        userinfo = (
-            parts.username if parts.password is None else f"{parts.username}:{parts.password}"
-        )
-        netloc = f"{userinfo}@{netloc}"
-    return netloc
+    return netloc_host if parts.port is None else f"{netloc_host}:{parts.port}"
 
 
 def validate_destination(url, check_dns=False):
@@ -101,6 +101,10 @@ def validate_destination(url, check_dns=False):
     parts = urlsplit(url)
     if parts.scheme.lower() not in ALLOWED_SCHEMES or not parts.netloc:
         raise ValidationError("Enter a full URL starting with http:// or https://.")
+    try:
+        _ = parts.port
+    except ValueError as error:
+        raise ValidationError("Enter a full URL starting with http:// or https://.") from error
     host = _normalize_host(parts.hostname)
     if not host:
         raise ValidationError("Enter a full URL starting with http:// or https://.")

@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 
-from apps.links import services
+from apps.links import destinations, services
 from apps.links.models import Link
 
 
@@ -13,6 +13,13 @@ def url(name, slug="acme-social", *args):
 def member_client(client, owner_membership):
     client.force_login(owner_membership.user)
     return client
+
+
+@pytest.fixture(autouse=True)
+def _fake_dns(monkeypatch):
+    """The service layer resolves every destination before saving it (I6); stub the
+    resolver so these tests never perform a real DNS lookup."""
+    monkeypatch.setattr(destinations, "resolve_host", lambda host, timeout: ["93.184.216.34"])
 
 
 @pytest.fixture

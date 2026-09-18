@@ -3,8 +3,16 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models.query import QuerySet
 
-from apps.links import services
+from apps.links import destinations, services
 from apps.links.models import Link, Tag
+
+
+@pytest.fixture(autouse=True)
+def _fake_dns(monkeypatch):
+    """The service layer resolves every destination before saving it (I6); stub the
+    resolver so these tests never perform a real DNS lookup. Tests exercising the
+    resolution failure/private-address paths override this per test."""
+    monkeypatch.setattr(destinations, "resolve_host", lambda host, timeout: ["93.184.216.34"])
 
 
 def test_create_link_generates_a_code_and_defaults(owner_membership, settings):
@@ -184,3 +192,31 @@ def test_set_tags_recovers_from_a_concurrent_create_race(owner_membership, monke
     monkeypatch.setattr(QuerySet, "create", flaky_create)
     tags = services.set_tags(owner_membership, link, ["campaign"])
     assert tags == [existing]
+
+
+def test_create_link_rejects_a_bad_og_image_url(owner_membership):
+    with pytest.raises(ValidationError):
+        services.create_link(
+            owner_membership,
+            destination_url="https://example.com",
+            og_image_url="javascript:alert(1)",
+        )
+    assert Link.objects.count() == 0
+
+
+def test_update_link_rejects_a_bad_og_image_url(owner_membership):
+    link = services.create_link(owner_membership, destination_url="https://example.com")
+    with pytest.raises(ValidationError):
+        services.update_link(owner_membership, link, og_image_url="http://127.0.0.1/x.png")
+    link.refresh_from_db()
+    assert link.og_image_url == ""
+
+
+def test_obfuscated_ip_literal_destinations_are_rejected_on_save(owner_membership, monkeypatch):
+    # Restore the real resolver for this test: the obfuscated forms below are only
+    # caught by DNS re-validation (I6), so faking the resolver away (as the module
+    # autouse fixture does) would hide the bug this test guards against.
+    monkeypatch.undo()
+    with pytest.raises(ValidationError):
+        services.create_link(owner_membership, destination_url="http://2130706433/")
+    assert Link.objects.count() == 0

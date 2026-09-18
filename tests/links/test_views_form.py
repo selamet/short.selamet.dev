@@ -1,7 +1,7 @@
 import pytest
 from django.urls import reverse
 
-from apps.links import services
+from apps.links import destinations, services
 from apps.links.models import Link
 
 
@@ -13,6 +13,14 @@ def url(name, slug="acme-social", *args):
 def member_client(client, owner_membership):
     client.force_login(owner_membership.user)
     return client
+
+
+@pytest.fixture(autouse=True)
+def _fake_dns(monkeypatch):
+    """The service layer resolves every destination before saving it (I6); stub the
+    resolver so these tests never perform a real DNS lookup. Tests exercising the
+    resolution failure/private-address paths override this per test."""
+    monkeypatch.setattr(destinations, "resolve_host", lambda host, timeout: ["93.184.216.34"])
 
 
 def test_create_page_renders_form(member_client, workspace):
@@ -64,6 +72,13 @@ def test_create_link_rerenders_with_errors(member_client, workspace):
     body = response.content.decode()
     assert "http://" in body
     assert "Reserved word" in body
+    assert not Link.objects.exists()
+
+
+def test_create_link_with_a_malformed_port_rerenders_instead_of_500ing(member_client, workspace):
+    response = member_client.post(url("create"), {"destination_url": "http://example.com:abc/"})
+    assert response.status_code == 200
+    assert "http://" in response.content.decode()
     assert not Link.objects.exists()
 
 
