@@ -2,16 +2,18 @@
 clicks are recorded (see apply_event, called from apps.analytics.tasks.record_click),
 and fully recomputable from raw ClickEvent rows at any time (see rebuild, meant for a
 nightly job that corrects whatever the incremental path might have missed).
+DailyClickIdentity backs both paths' notion of "unique": see _claim_identity.
 """
 
+import hashlib
 import logging
 import zoneinfo
 from datetime import UTC, datetime, time, timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F
 
-from .models import ClickEvent, DailyLinkBreakdown, DailyLinkStat, Dimension
+from .models import ClickEvent, DailyClickIdentity, DailyLinkBreakdown, DailyLinkStat, Dimension
 
 logger = logging.getLogger(__name__)
 
@@ -70,25 +72,59 @@ def dimensions_for(event):
     return pairs
 
 
-def is_unique(event, day):
-    """True when no earlier ClickEvent on the same link and day shares this event's
-    ip_hash and user_agent.
+def _identity(ip_hash, user_agent):
+    """A short, fixed-width key for one (ip_hash, user_agent) pair.
 
-    An empty ip_hash means we cannot tell visitors apart at all: refusing to count
-    any of those clicks as unique would understate real unique reach more than
-    treating each of them as unique overstates it, so an empty ip_hash always counts
-    as unique.
+    Plain hashlib.sha256(...).hexdigest() -- the same idiom already used for exactly
+    this kind of thing elsewhere in this codebase (apps.core.ratelimit.hashed_identity,
+    apps.core.privacy.hash_ip, apps.accounts.services.hash_token) -- rather than a new
+    hashing scheme: DailyClickIdentity.identity just needs a bounded, deterministic
+    column to put a uniqueness constraint on, no matter how long a user_agent string
+    turns out to be.
     """
-    if not event.ip_hash:
-        return True
-    start, _end = _day_bounds(event.workspace, day)
-    return not ClickEvent.objects.filter(
-        link_id=event.link_id,
-        ip_hash=event.ip_hash,
-        user_agent=event.user_agent,
-        occurred_at__gte=start,
-        occurred_at__lt=event.occurred_at,
-    ).exists()
+    return hashlib.sha256(f"{ip_hash}:{user_agent}".encode()).hexdigest()
+
+
+def _claim_identity(event, day):
+    """True exactly when this event is the first click for its (ip_hash, user_agent)
+    identity on this link and day; false for a bot click, which never claims one.
+
+    Decided by attempting an INSERT, not by querying for an earlier event first: a
+    query-then-decide check (the old is_unique()) has a race between the read and the
+    write, since neither of two workers handling the same identity at the same time
+    can see the other's still-uncommitted row -- both would see "no earlier event"
+    and both would count themselves unique. Racing the INSERT against
+    DailyClickIdentity's own unique constraint instead has no such window: PostgreSQL
+    either accepts it (this click is the first for that identity today) or raises
+    IntegrityError against a row another worker already committed (it is not), with
+    nothing in between. Run in its own savepoint: catching IntegrityError inside the
+    caller's still-open transaction would otherwise poison it for every query after
+    (see the same reasoning on the nested atomic() around this call in
+    apps.analytics.tasks.record_click).
+
+    An empty ip_hash still claims an identity exactly like any other value, rather
+    than always counting as unique the way the old is_unique() special-cased it: with
+    a unique constraint now deciding this, "always unique" would mean skipping the
+    claim entirely, which reopens the same race this function exists to close. Two
+    different visitors who both end up with a blank ip_hash (a hashing failure, see
+    apps.redirects.views._hashed_client_ip) and share a user agent will now collide
+    and only the first is counted unique that day -- the same "we cannot fully tell
+    these visitors apart" trade-off as before, just resolved the same way every other
+    identity is rather than as a special case.
+    """
+    if event.is_bot:
+        return False
+    try:
+        with transaction.atomic():
+            DailyClickIdentity.objects.create(
+                link=event.link,
+                workspace=event.workspace,
+                date=day,
+                identity=_identity(event.ip_hash, event.user_agent),
+            )
+    except IntegrityError:
+        return False
+    return True
 
 
 def _upsert(model, lookup, seed, deltas):
@@ -124,9 +160,7 @@ def apply_event(event):
     """Fold one click into its day's DailyLinkStat row and one DailyLinkBreakdown row
     per non-empty dimension it carries."""
     day = local_date(event)
-    # Bot clicks are counted (bot_clicks, clicks) but never counted as unique,
-    # regardless of what is_unique would otherwise say about their ip_hash/user_agent.
-    unique = is_unique(event, day) and not event.is_bot
+    unique = _claim_identity(event, day)
     _upsert(
         DailyLinkStat,
         lookup={"link": event.link, "date": day},
@@ -147,9 +181,18 @@ def apply_event(event):
 
 
 def rebuild(link, day):
-    """Recompute both rollup tables for one link and day from the raw events,
-    replacing whatever is currently stored. Runs inside one transaction so a reader
-    never sees a half-rebuilt day."""
+    """Recompute both rollup tables, and the day's DailyClickIdentity rows, for one
+    link and day from the raw events, replacing whatever is currently stored. Runs
+    inside one transaction so a reader never sees a half-rebuilt day.
+
+    Uniqueness here follows exactly the same rule _claim_identity() enforces
+    concurrently -- one DailyClickIdentity row per (link, date, identity), first
+    occurrence wins -- rather than a second, parallel definition of "unique": this
+    function is single-threaded and already walks the whole day in occurred_at
+    order, so a plain set is enough to find each identity's first occurrence here,
+    where DailyClickIdentity's unique constraint is what finds it under concurrent
+    writers.
+    """
     workspace = link.workspace
     start, end = _day_bounds(workspace, day)
     events = ClickEvent.objects.filter(
@@ -158,20 +201,20 @@ def rebuild(link, day):
 
     totals = {"clicks": 0, "unique_clicks": 0, "bot_clicks": 0}
     breakdown_totals = {}
-    seen = set()
+    identities_seen = set()
+    identities_to_create = []
     for event in events:
         totals["clicks"] += 1
         if event.is_bot:
             totals["bot_clicks"] += 1
-        # Mirrors is_unique(): the first event for a given (ip_hash, user_agent) in
-        # the day is the unique one, regardless of whether it (or a later repeat) is
-        # a bot click; only non-bot events ever add to unique_clicks.
-        fingerprint = (event.ip_hash, event.user_agent)
-        first_seen = not event.ip_hash or fingerprint not in seen
-        if first_seen and not event.is_bot:
-            totals["unique_clicks"] += 1
-        if event.ip_hash:
-            seen.add(fingerprint)
+        else:
+            # A bot event never claims an identity (see _claim_identity), so it can
+            # never block a later genuine click that happens to share one.
+            identity = _identity(event.ip_hash, event.user_agent)
+            if identity not in identities_seen:
+                identities_seen.add(identity)
+                identities_to_create.append(identity)
+                totals["unique_clicks"] += 1
         for dimension, value in dimensions_for(event):
             key = (dimension, value)
             breakdown_totals[key] = breakdown_totals.get(key, 0) + 1
@@ -179,6 +222,7 @@ def rebuild(link, day):
     with transaction.atomic():
         DailyLinkStat.objects.filter(link=link, date=day).delete()
         DailyLinkBreakdown.objects.filter(link=link, date=day).delete()
+        DailyClickIdentity.objects.filter(link=link, date=day).delete()
         if totals["clicks"]:
             DailyLinkStat.objects.create(link=link, workspace=workspace, date=day, **totals)
         DailyLinkBreakdown.objects.bulk_create(
@@ -191,4 +235,8 @@ def rebuild(link, day):
                 clicks=clicks,
             )
             for (dimension, value), clicks in breakdown_totals.items()
+        )
+        DailyClickIdentity.objects.bulk_create(
+            DailyClickIdentity(link=link, workspace=workspace, date=day, identity=identity)
+            for identity in identities_to_create
         )

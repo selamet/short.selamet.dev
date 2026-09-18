@@ -107,3 +107,34 @@ class DailyLinkBreakdown(models.Model):
 
     def __str__(self):
         return f"breakdown {self.link_id} @ {self.date} {self.dimension}={self.value}"
+
+
+class DailyClickIdentity(models.Model):
+    """One row per link, day and visitor identity (a hash of ip_hash + user_agent).
+
+    Exists solely so "is this click unique today" is an atomic INSERT against this
+    table's own unique constraint, rather than a read-then-decide query that two
+    concurrent workers could both pass at once (see apps.analytics.rollups
+    ._claim_identity). Purged together with the raw ClickEvent rows it is derived
+    from; it carries no information a rebuild cannot regenerate.
+    """
+
+    link = models.ForeignKey(
+        "links.Link", on_delete=models.CASCADE, related_name="daily_identities"
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_identities"
+    )
+    date = models.DateField()
+    identity = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["link", "date", "identity"], name="analytics_daily_identity_unique"
+            )
+        ]
+        indexes = [models.Index(fields=["workspace", "date"])]
+
+    def __str__(self):
+        return f"identity {self.link_id} @ {self.date} {self.identity[:8]}"

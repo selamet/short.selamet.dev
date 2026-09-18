@@ -62,7 +62,11 @@ def record_click(
     does not retry a task today; worth revisiting if that changes.
     """
     try:
-        link = Link.objects.get(pk=link_id)
+        # select_related: rollups.apply_event() below reads event.workspace (for the
+        # day's timezone and to stamp the rollup rows); without this, that would be a
+        # second query on every single click, since ClickEvent.objects.create() below
+        # is given workspace_id, not the workspace object.
+        link = Link.objects.select_related("workspace").get(pk=link_id)
     except Link.DoesNotExist:
         logger.warning("click recording skipped: link_id=%s no longer exists", link_id)
         return
@@ -89,7 +93,7 @@ def record_click(
     with transaction.atomic():
         event = ClickEvent.objects.create(
             link=link,
-            workspace_id=link.workspace_id,
+            workspace=link.workspace,
             occurred_at=parse_datetime(occurred_at),
             is_bot=useragent.is_bot(user_agent),
             **{name: _truncated(name, value) for name, value in string_fields.items()},

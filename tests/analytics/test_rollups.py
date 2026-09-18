@@ -4,10 +4,11 @@ DailyLinkBreakdown, and the from-scratch rebuild of both from raw ClickEvent row
 from datetime import UTC, datetime
 
 import pytest
+from django.db import IntegrityError
 from django.utils import timezone
 
 from apps.analytics import attribution, rollups
-from apps.analytics.models import ClickEvent, DailyLinkBreakdown, DailyLinkStat
+from apps.analytics.models import ClickEvent, DailyClickIdentity, DailyLinkBreakdown, DailyLinkStat
 from apps.analytics.tasks import record_click
 from apps.core.privacy import hash_ip
 from apps.links import services as link_services
@@ -99,6 +100,41 @@ def test_a_bot_click_counts_but_never_as_unique(link):
 
 
 @pytest.mark.django_db
+def test_two_clicks_sharing_an_identity_produce_one_unique_regardless_of_order(link):
+    rollups.apply_event(_event(link, ip_hash=IP_A, user_agent=DESKTOP_UA))
+    rollups.apply_event(_event(link, ip_hash=IP_A, user_agent=DESKTOP_UA))
+    stat = DailyLinkStat.objects.get(link=link)
+    assert stat.clicks == 2
+    assert stat.unique_clicks == 1
+    assert DailyClickIdentity.objects.filter(link=link).count() == 1
+
+
+@pytest.mark.django_db
+def test_a_bot_click_never_blocks_a_later_genuine_click_with_the_same_identity(link):
+    # Same ip_hash and user_agent for both: only is_bot differs, which _click() (via
+    # useragent.is_bot()) cannot vary independently of the user agent string, so this
+    # goes through apply_event() directly.
+    rollups.apply_event(_event(link, ip_hash=IP_A, user_agent=DESKTOP_UA, is_bot=True))
+    rollups.apply_event(_event(link, ip_hash=IP_A, user_agent=DESKTOP_UA, is_bot=False))
+    stat = DailyLinkStat.objects.get(link=link)
+    assert stat.clicks == 2
+    assert stat.bot_clicks == 1
+    assert stat.unique_clicks == 1
+
+
+@pytest.mark.django_db
+def test_a_racing_identity_insert_is_counted_as_non_unique_not_an_error(link, monkeypatch):
+    def boom(**kwargs):
+        raise IntegrityError("duplicate key value violates unique constraint")
+
+    monkeypatch.setattr(DailyClickIdentity.objects, "create", boom)
+    rollups.apply_event(_event(link))
+    stat = DailyLinkStat.objects.get(link=link)
+    assert stat.clicks == 1
+    assert stat.unique_clicks == 0
+
+
+@pytest.mark.django_db
 def test_breakdown_rows_skip_empty_dimensions(link):
     event = _event(link, country="", city="", referrer_host="", utm_source="instagram")
     rollups.apply_event(event)
@@ -120,7 +156,7 @@ def test_two_clicks_from_the_same_country_accumulate_one_row(link):
 def test_rebuild_reproduces_exactly_the_same_rows(link):
     rollups.apply_event(_event(link, country="US"))
     rollups.apply_event(_event(link, country="US", ip_hash=IP_B))
-    rollups.apply_event(_event(link, user_agent=BOT_UA))
+    rollups.apply_event(_event(link, user_agent=BOT_UA, is_bot=True))
     today = timezone.localdate()
 
     before_stat = DailyLinkStat.objects.get(link=link, date=today)
@@ -130,9 +166,13 @@ def test_rebuild_reproduces_exactly_the_same_rows(link):
         .order_by("dimension", "value")
         .values("dimension", "value", "clicks")
     )
+    before_identities = set(
+        DailyClickIdentity.objects.filter(link=link, date=today).values_list("identity", flat=True)
+    )
 
     DailyLinkStat.objects.filter(link=link).delete()
     DailyLinkBreakdown.objects.filter(link=link).delete()
+    DailyClickIdentity.objects.filter(link=link).delete()
     rollups.rebuild(link, today)
 
     after_stat = DailyLinkStat.objects.get(link=link, date=today)
@@ -141,16 +181,27 @@ def test_rebuild_reproduces_exactly_the_same_rows(link):
         .order_by("dimension", "value")
         .values("dimension", "value", "clicks")
     )
+    after_identities = set(
+        DailyClickIdentity.objects.filter(link=link, date=today).values_list("identity", flat=True)
+    )
     assert (after_stat.clicks, after_stat.unique_clicks, after_stat.bot_clicks) == before
     assert after_breakdown == before_breakdown
+    assert after_identities == before_identities
 
 
 @pytest.mark.django_db
-def test_rebuild_corrects_tampered_numbers(link):
+def test_rebuild_corrects_tampered_numbers_and_identities(link):
     rollups.apply_event(_event(link, country="US"))
     today = timezone.localdate()
     DailyLinkStat.objects.filter(link=link, date=today).update(clicks=999, unique_clicks=999)
     DailyLinkBreakdown.objects.filter(link=link, date=today).update(clicks=999)
+    # Tamper with the identity table too: add a bogus extra row and drop the real one,
+    # so a rebuild that merely trusted what was there instead of recomputing it would
+    # keep miscounting.
+    DailyClickIdentity.objects.filter(link=link, date=today).delete()
+    DailyClickIdentity.objects.create(
+        link=link, workspace=link.workspace, date=today, identity="bogus"
+    )
 
     rollups.rebuild(link, today)
 
@@ -160,6 +211,9 @@ def test_rebuild_corrects_tampered_numbers(link):
         link=link, date=today, dimension="country", value="US"
     )
     assert breakdown.clicks == 1
+    identities = list(DailyClickIdentity.objects.filter(link=link, date=today))
+    assert len(identities) == 1
+    assert identities[0].identity != "bogus"
 
 
 @pytest.mark.django_db
