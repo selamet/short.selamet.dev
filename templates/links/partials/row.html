@@ -3,7 +3,8 @@
         title="{{ link.get_status_display }}"></span>
   <div class="min-w-0 flex-1">
     <div class="flex items-center gap-2">
-      <span class="mono font-medium">{{ SHORT_DOMAIN }}/{{ link.code }}</span>
+      <a href="{{ link.short_url }}" target="_blank" rel="noopener" class="mono font-medium hover:underline">{{ SHORT_DOMAIN }}/{{ link.code }}</a>
+      <a href="{{ link.short_url }}+" target="_blank" rel="noopener" class="text-[11.5px] text-ink-muted underline">preview</a>
     </div>
     <div class="mt-1 flex min-w-0 items-center gap-2 text-ink-muted">
       {% if link.favicon_url %}<img src="{{ link.favicon_url }}" alt="" class="h-3.5 w-3.5 shrink-0 rounded-sm">{% endif %}
