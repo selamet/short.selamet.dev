@@ -28,8 +28,16 @@ CRAWLER_TOKENS = (
 # Broader than CRAWLER_TOKENS: generic bot/script signatures that should be flagged as
 # non-human traffic in analytics, but that the redirect path still serves a normal
 # redirect to (only CRAWLER_TOKENS gets the Open Graph card instead).
+#
+# No bare "bot": it also matches ordinary tokens and product names that merely contain
+# the letters (e.g. "robot"), flagging real browsers as bots. "bot/" (a version
+# suffix, e.g. "Googlebot/2.1"), "bot " (a space-separated token) and "+bot" (a
+# parenthetical contact URL, e.g. Googlebot's "(+http://www.google.com/bot.html)")
+# cover real bot user agents without that false-positive risk.
 BOT_TOKENS = (
-    "bot",
+    "bot/",
+    "bot ",
+    "+bot",
     "spider",
     "crawler",
     "curl",

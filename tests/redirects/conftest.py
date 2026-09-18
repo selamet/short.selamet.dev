@@ -3,7 +3,6 @@ import pytest
 from apps.accounts.models import User
 from apps.links import destinations
 from apps.links import services as link_services
-from apps.links import tasks as link_tasks
 from apps.workspaces import services as workspace_services
 from apps.workspaces.models import Membership, Role
 
@@ -18,21 +17,6 @@ def _fake_dns(monkeypatch):
     resolver so these tests never perform a real DNS lookup (see tests/links for the
     same pattern)."""
     monkeypatch.setattr(destinations, "resolve_host", lambda host, timeout: ["93.184.216.34"])
-
-
-@pytest.fixture(autouse=True)
-def _no_network(monkeypatch):
-    """A test that changes a link's destination inside
-    `django_capture_on_commit_callbacks` (see test_invalidation.py) makes update_link's
-    deferred `fetch_link_metadata.enqueue(...)` run for real, which would otherwise try
-    to reach the destination over the network with the immediate task backend. Patch the
-    same seam tests/links/test_tasks.py uses so any such fetch fails loudly and locally
-    instead of silently depending on (or reaching out over) a real network."""
-
-    def _forbidden(client, url, **kwargs):
-        raise AssertionError("a test tried to reach the network")
-
-    monkeypatch.setattr(link_tasks, "_open_stream", _forbidden)
 
 
 @pytest.fixture

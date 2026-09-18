@@ -14,6 +14,7 @@ from django.http import HttpResponse
 
 from apps.core import ratelimit
 from apps.core.http import client_ip
+from apps.links import codes as code_utils
 
 from . import views
 
@@ -40,8 +41,14 @@ class RedirectMiddleware:
             response["Retry-After"] = "1"
             response["Cache-Control"] = "no-store"
             return response
-        if code.endswith("+"):
-            return views.preview(request, code[:-1])
+        is_preview = code.endswith("+")
+        # Normalized once, here, so the redirect and the preview page agree on the
+        # same code: without this, "/%20spring-drop" and "/spring-drop///" resolved to
+        # the same link but were treated as different cache entries, and the preview
+        # page rendered whatever un-normalized code the visitor typed.
+        code = code_utils.normalize_code(code[:-1] if is_preview else code)
+        if is_preview:
+            return views.preview(request, code)
         return views.redirect_view(request, code)
 
     def _code_for(self, path):
@@ -49,6 +56,12 @@ class RedirectMiddleware:
             return None
         trimmed = path[1:].rstrip("/")
         if not trimmed or "/" in trimmed:
+            return None
+        # A single segment with a dot looks like a static file (favicon.ico,
+        # robots.txt), never a short code: codes never contain a dot (see
+        # codes.CODE_RE). Fall through to the normal URL stack instead of claiming it
+        # here and rendering a branded 404 for what is really a missing static asset.
+        if "." in trimmed:
             return None
         first = trimmed.split("+")[0]
         if first in RESERVED_PREFIXES or first == settings.ADMIN_URL_PATH:

@@ -216,6 +216,24 @@ def test_click_recording_hashes_an_empty_client_ip_to_an_empty_string(link, monk
 
 
 @pytest.mark.django_db
+def test_a_hashing_failure_still_enqueues_the_click_with_an_empty_ip_hash(
+    link, monkeypatch, caplog
+):
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+
+    def boom(ip):
+        raise RuntimeError("cache down")
+
+    monkeypatch.setattr("apps.redirects.views.hash_ip", boom)
+    response = client_get(link.code)
+    assert response.status_code == 302
+    assert len(calls) == 1
+    assert calls[0][1]["ip_hash"] == ""
+    assert "ip hashing failed" in caplog.text
+
+
+@pytest.mark.django_db
 def test_click_recording_strips_credentials_and_the_query_string_before_enqueuing(
     link, monkeypatch
 ):
@@ -241,6 +259,19 @@ def test_click_recording_strips_credentials_and_the_query_string_before_enqueuin
     for value in kwargs.values():
         assert "secret" not in str(value)
         assert "frag" not in str(value)
+
+
+@pytest.mark.django_db
+def test_a_warm_redirect_makes_no_queries(link, monkeypatch, django_assert_num_queries):
+    calls = []
+    # The click enqueue is its own write, off the redirect's own read path (see the
+    # module docstring); stub it out so this measures the redirect handling itself,
+    # not the (in tests, synchronous) task it schedules.
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    client_get(link.code)  # warms the cache
+    with django_assert_num_queries(0):
+        response = client_get(link.code)
+    assert response.status_code == 302
 
 
 @pytest.mark.django_db

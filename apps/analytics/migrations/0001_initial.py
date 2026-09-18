@@ -5,40 +5,67 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
-        ('links', '0001_initial'),
+        ("links", "0001_initial"),
+        ("workspaces", "0001_initial"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ClickEvent',
+            name="ClickEvent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('occurred_at', models.DateTimeField(db_index=True)),
-                ('ip_hash', models.CharField(blank=True, max_length=64)),
-                ('country', models.CharField(blank=True, max_length=2)),
-                ('city', models.CharField(blank=True, max_length=80)),
-                ('device_type', models.CharField(blank=True, max_length=20)),
-                ('os', models.CharField(blank=True, max_length=40)),
-                ('browser', models.CharField(blank=True, max_length=60)),
-                ('referrer_host', models.CharField(blank=True, max_length=255)),
-                ('referrer_url', models.CharField(blank=True, max_length=1024)),
-                ('utm_source', models.CharField(blank=True, max_length=100)),
-                ('utm_medium', models.CharField(blank=True, max_length=100)),
-                ('utm_campaign', models.CharField(blank=True, max_length=100)),
-                ('utm_content', models.CharField(blank=True, max_length=100)),
-                ('utm_term', models.CharField(blank=True, max_length=100)),
-                ('target_platform', models.CharField(blank=True, max_length=10)),
-                ('is_bot', models.BooleanField(default=False)),
-                ('user_agent', models.CharField(blank=True, max_length=256)),
-                ('link', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='clicks', to='links.link')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("occurred_at", models.DateTimeField(db_index=True)),
+                ("ip_hash", models.CharField(blank=True, max_length=64)),
+                ("country", models.CharField(blank=True, max_length=2)),
+                ("city", models.CharField(blank=True, max_length=80)),
+                ("device_type", models.CharField(blank=True, max_length=20)),
+                ("os", models.CharField(blank=True, max_length=40)),
+                ("browser", models.CharField(blank=True, max_length=60)),
+                ("referrer_host", models.CharField(blank=True, max_length=255)),
+                ("referrer_url", models.CharField(blank=True, max_length=1024)),
+                ("utm_source", models.CharField(blank=True, max_length=100)),
+                ("utm_medium", models.CharField(blank=True, max_length=100)),
+                ("utm_campaign", models.CharField(blank=True, max_length=100)),
+                ("utm_content", models.CharField(blank=True, max_length=100)),
+                ("utm_term", models.CharField(blank=True, max_length=100)),
+                ("target_platform", models.CharField(blank=True, max_length=10)),
+                ("is_bot", models.BooleanField(default=False)),
+                ("user_agent", models.CharField(blank=True, max_length=256)),
+                (
+                    "link",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="clicks",
+                        to="links.link",
+                    ),
+                ),
+                (
+                    "workspace",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="clicks",
+                        to="workspaces.workspace",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-occurred_at'],
-                'indexes': [models.Index(fields=['link', '-occurred_at'], name='analytics_c_link_id_aa1363_idx')],
+                "ordering": ["-occurred_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["link", "-occurred_at"], name="analytics_c_link_id_aa1363_idx"
+                    ),
+                    models.Index(
+                        fields=["workspace", "occurred_at"], name="analytics_c_workspa_dbc453_idx"
+                    ),
+                ],
             },
         ),
     ]

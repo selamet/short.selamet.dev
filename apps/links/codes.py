@@ -35,6 +35,9 @@ def validate_code(code):
             "Use 3 to 40 letters, numbers, hyphens or underscores, starting and ending "
             "with a letter or number."
         )
-    if code in RESERVED_CODES:
+    # The admin path is environment-configurable (see apps.links.reserved), so it
+    # cannot be baked into RESERVED_CODES; checked here against the live setting
+    # instead, so a link can never be created at a code the admin URL would shadow.
+    if code in RESERVED_CODES or code == settings.ADMIN_URL_PATH:
         raise ValidationError("Reserved word — pick another code.")
     return code

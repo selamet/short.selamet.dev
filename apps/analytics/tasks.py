@@ -83,6 +83,7 @@ def record_click(
     with transaction.atomic():
         ClickEvent.objects.create(
             link=link,
+            workspace_id=link.workspace_id,
             occurred_at=parse_datetime(occurred_at),
             is_bot=useragent.is_bot(user_agent),
             **{name: _truncated(name, value) for name, value in string_fields.items()},

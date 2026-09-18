@@ -10,6 +10,12 @@ class ClickEvent(models.Model):
     """
 
     link = models.ForeignKey("links.Link", on_delete=models.CASCADE, related_name="clicks")
+    # Denormalized from link.workspace by the task, not the redirect path: it saves
+    # every workspace-scoped analytics query a join back through links.Link, and adding
+    # it now costs nothing because this table is still empty.
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="clicks"
+    )
     occurred_at = models.DateTimeField(db_index=True)
     ip_hash = models.CharField(max_length=64, blank=True)
     country = models.CharField(max_length=2, blank=True)
@@ -30,7 +36,10 @@ class ClickEvent(models.Model):
 
     class Meta:
         ordering = ["-occurred_at"]
-        indexes = [models.Index(fields=["link", "-occurred_at"])]
+        indexes = [
+            models.Index(fields=["link", "-occurred_at"]),
+            models.Index(fields=["workspace", "occurred_at"]),
+        ]
 
     def __str__(self):
         return f"click {self.link_id} @ {self.occurred_at:%Y-%m-%d %H:%M}"

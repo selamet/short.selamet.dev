@@ -44,6 +44,7 @@ def test_record_click_writes_an_event_and_increments_the_counter(link):
     _record(link)
     event = ClickEvent.objects.get()
     assert event.link_id == link.pk
+    assert event.workspace_id == link.workspace_id
     assert event.target_platform == "desktop"
     assert event.device_type == "desktop"
     # DESKTOP_UA carries no recognizable browser token; browser() and

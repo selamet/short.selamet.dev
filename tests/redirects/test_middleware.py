@@ -39,6 +39,33 @@ def test_paths_with_more_than_one_segment_are_not_claimed(client):
 
 
 @pytest.mark.django_db
+def test_a_url_encoded_space_and_extra_slashes_resolve_to_the_same_link(client, link):
+    padded = client.get(f"/%20{link.code}", HTTP_USER_AGENT=DESKTOP_UA)
+    trailing = client.get(f"/{link.code}///", HTTP_USER_AGENT=DESKTOP_UA)
+    assert padded.status_code == 302
+    assert padded["Location"] == "https://example.com/p"
+    assert trailing.status_code == 302
+    assert trailing["Location"] == "https://example.com/p"
+
+
+@pytest.mark.django_db
+def test_the_preview_page_renders_the_normalized_code(client, link):
+    response = client.get(f"/%20{link.code.upper()}+", HTTP_USER_AGENT=DESKTOP_UA)
+    assert response.status_code == 200
+    body = response.content.decode()
+    assert link.code in body
+    assert link.code.upper() not in body
+
+
+@pytest.mark.django_db
+def test_single_segments_with_a_dot_fall_through_instead_of_a_branded_404(client, db):
+    response = client.get("/favicon.ico")
+    assert response.status_code == 404
+    # Django's default 404, not the branded "this short link doesn't exist" page.
+    assert b"doesn\xe2\x80\x99t exist" not in response.content
+
+
+@pytest.mark.django_db
 def test_a_database_outage_returns_503(client, monkeypatch):
     from django.db import OperationalError
 

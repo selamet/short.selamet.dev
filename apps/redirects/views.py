@@ -54,6 +54,18 @@ def _resolve_or_error(request, code, user_agent):
         return None, _unavailable(request)
 
 
+def _hashed_client_ip(request):
+    # Hashed here, not in the task: the production task backend persists its
+    # arguments to the database, and an IP address must never land there raw. A
+    # failure here (the daily salt lives in the cache) must not cost the click: it is
+    # worth recording with an empty ip_hash rather than not at all.
+    try:
+        return hash_ip(client_ip(request))
+    except Exception:
+        logger.warning("ip hashing failed; recording the click without one", exc_info=True)
+        return ""
+
+
 def _record(request, resolution):
     # Split here, not in the task: the production task backend persists its arguments
     # to the database, and the raw referrer (which can carry credentials in its
@@ -66,9 +78,7 @@ def _record(request, resolution):
         record_click.enqueue(
             resolution.link_id,
             occurred_at=timezone.now().isoformat(),
-            # Hashed here, not in the task: the production task backend persists its
-            # arguments to the database, and an IP address must never land there raw.
-            ip_hash=hash_ip(client_ip(request)),
+            ip_hash=_hashed_client_ip(request),
             user_agent=request.META.get("HTTP_USER_AGENT", "")[:256],
             referrer_host=referrer_host,
             referrer_url=referrer_url,

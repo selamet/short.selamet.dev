@@ -55,3 +55,9 @@ def test_validate_code_accepts_good_values(code):
 def test_validate_code_rejects_the_extended_reserved_words(code):
     with pytest.raises(ValidationError):
         codes.validate_code(code)
+
+
+def test_validate_code_rejects_the_configured_admin_url_path(settings):
+    settings.ADMIN_URL_PATH = "not-a-normally-reserved-word"
+    with pytest.raises(ValidationError):
+        codes.validate_code("not-a-normally-reserved-word")
