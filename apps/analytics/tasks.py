@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 
 @task
-def record_click(link_id, *, occurred_at, ip, user_agent, referrer, query_string, target_platform):
+def record_click(
+    link_id, *, occurred_at, ip_hash, user_agent, referrer, query_string, target_platform
+):
     logger.debug(
         "click recorded (stub) link_id=%s platform=%s occurred_at=%s",
         link_id,

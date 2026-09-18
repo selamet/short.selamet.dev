@@ -11,7 +11,7 @@
 {% endblock %}
 {% block scripts %}
 {{ resolution.app_url|json_script:"deep-link-app-url" }}
-{{ resolution.fallback_url|json_script:"deep-link-fallback-url" }}
+{{ resolution.fallback_url|default:resolution.url|json_script:"deep-link-fallback-url" }}
 {{ fallback_ms|json_script:"deep-link-fallback-ms" }}
 <script nonce="{{ csp_nonce }}">
 (function () {
@@ -20,7 +20,12 @@
   var fallbackMs = JSON.parse(document.getElementById("deep-link-fallback-ms").textContent);
   window.location.href = appUrl;
   window.setTimeout(function () {
-    window.location.href = fallbackUrl;
+    // A visitor should never be sent to an empty location: the link service refuses
+    // to store an app scheme without a web fallback, but the page does not rely on
+    // that — it always has resolution.url (the destination) as a last resort.
+    if (fallbackUrl) {
+      window.location.href = fallbackUrl;
+    }
   }, fallbackMs);
 })();
 </script>

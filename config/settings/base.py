@@ -90,6 +90,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # CSP has to run before RedirectMiddleware: its process_request is what makes the
+    # nonce a rendered redirect page uses available, and since RedirectMiddleware can
+    # return a response without ever calling further down the chain, CSP's
+    # process_response is the only place that response still passes through on its way
+    # out, which is what actually attaches the Content-Security-Policy header. It does
+    # no session, database or authentication work, so the hot path stays as cheap as
+    # the constraint intends.
+    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     # Ordering is the point: short-code paths are claimed here, before session, CSRF,
     # authentication or messages middleware ever run, so a click never pays for any of
     # that work.
@@ -100,7 +108,6 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 

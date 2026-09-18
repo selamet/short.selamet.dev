@@ -49,3 +49,11 @@ def test_a_database_outage_returns_503(client, monkeypatch):
     response = client.get("/spring-drop", HTTP_USER_AGENT=DESKTOP_UA)
     assert response.status_code == 503
     assert response["Retry-After"] == "5"
+
+
+@pytest.mark.django_db
+def test_an_ordinary_dashboard_page_still_carries_its_csp_header(client, db):
+    """RedirectMiddleware sits right after ContentSecurityPolicyMiddleware now; a page
+    that never touches the redirect path at all must keep getting its header."""
+    response = client.get("/auth/login/")
+    assert "'nonce-" in response["Content-Security-Policy"]

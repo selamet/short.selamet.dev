@@ -1,3 +1,4 @@
+import re
 from datetime import timedelta
 
 import pytest
@@ -5,6 +6,8 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.links import services as link_services
+from apps.links.models import Link
+from apps.redirects import resolver
 from tests.redirects.conftest import ANDROID_UA, DESKTOP_UA, IOS_UA
 
 CRAWLER_UA = "facebookexternalhit/1.1"
@@ -79,6 +82,28 @@ def test_deep_link_page_offers_the_app_and_a_fallback(membership, link):
 
 
 @pytest.mark.django_db
+def test_deep_link_page_carries_a_real_csp_nonce_matching_the_header(membership, link):
+    link_services.update_link(
+        membership,
+        link,
+        targets=[
+            {
+                "platform": "ios",
+                "url": "",
+                "app_url": "instagram://acme",
+                "fallback_url": "https://m.example.com/ios",
+            }
+        ],
+    )
+    response = client_get(link.code, IOS_UA)
+    csp = response["Content-Security-Policy"]
+    assert "'nonce-" in csp
+    header_nonce = re.search(r"'nonce-([^']+)'", csp).group(1)
+    assert header_nonce != "None"
+    assert f'nonce="{header_nonce}"' in response.content.decode()
+
+
+@pytest.mark.django_db
 def test_android_target_without_an_app_url_redirects(membership, link):
     link_services.update_link(
         membership,
@@ -132,6 +157,49 @@ def test_a_failed_enqueue_still_redirects(link, monkeypatch, caplog):
     response = client_get(link.code)
     assert response.status_code == 302
     assert "click was not recorded" in caplog.text
+
+
+@pytest.mark.django_db
+def test_click_recording_hashes_the_client_ip(link, monkeypatch):
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    client_get(link.code)
+    assert len(calls) == 1
+    _args, kwargs = calls[0]
+    assert "ip" not in kwargs
+    assert len(kwargs["ip_hash"]) == 64
+    assert "127.0.0.1" not in kwargs["ip_hash"]
+
+
+@pytest.mark.django_db
+def test_click_recording_hashes_an_empty_client_ip_to_an_empty_string(link, monkeypatch):
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    monkeypatch.setattr("apps.redirects.views.client_ip", lambda request: "")
+    client_get(link.code)
+    assert calls[0][1]["ip_hash"] == ""
+
+
+@pytest.mark.django_db
+def test_deep_link_falls_back_to_the_destination_when_no_web_fallback_is_set(monkeypatch):
+    """The link service refuses to store an app scheme without a web fallback, so build
+    the Resolution directly to exercise the page's own defense against that case."""
+    resolution = resolver.Resolution(
+        link_id=1,
+        status=Link.Status.ACTIVE,
+        url="https://example.com/p",
+        platform="ios",
+        app_url="myapp://open",
+        fallback_url="",
+    )
+    monkeypatch.setattr("apps.redirects.resolver.resolve", lambda code, ua: resolution)
+    response = client_get("whatever-code")
+    body = response.content.decode()
+    assert 'href="https://example.com/p"' in body
+    assert (
+        '<script id="deep-link-fallback-url" type="application/json">'
+        '"https://example.com/p"</script>'
+    ) in body
 
 
 @pytest.mark.django_db
