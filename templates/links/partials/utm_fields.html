@@ -1,0 +1,18 @@
+{% firstof values.utm_source form.utm_source.value "" as u_source %}
+{% firstof values.utm_medium form.utm_medium.value "" as u_medium %}
+{% firstof values.utm_campaign form.utm_campaign.value "" as u_campaign %}
+{% firstof values.utm_content form.utm_content.value "" as u_content %}
+{% firstof values.utm_term form.utm_term.value "" as u_term %}
+<div class="grid gap-3 sm:grid-cols-2">
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Source</span>
+    <input type="text" name="utm_source" value="{{ u_source }}" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"></label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Medium</span>
+    <input type="text" name="utm_medium" value="{{ u_medium }}" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"></label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Campaign</span>
+    <input type="text" name="utm_campaign" value="{{ u_campaign }}" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"></label>
+  <label class="flex flex-col gap-1"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Content</span>
+    <input type="text" name="utm_content" value="{{ u_content }}" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"></label>
+  <label class="flex flex-col gap-1 sm:col-span-2"><span class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Term</span>
+    <input type="text" name="utm_term" value="{{ u_term }}" class="rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"></label>
+</div>
+{% if final_url %}<p class="mt-2 text-[12.5px] text-ink-muted">Final URL: <span class="mono break-all">{{ final_url }}</span></p>{% endif %}

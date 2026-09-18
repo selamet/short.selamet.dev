@@ -96,11 +96,15 @@ def test_check_slug_is_rate_limited(client, user):
     assert "Too many checks" in blocked.content.decode()
 
 
-def test_dashboard_renders_guided_empty_state_for_members(client, workspace, member_membership):
+def test_dashboard_redirects_to_the_links_list_guided_empty_state(
+    client, workspace, member_membership
+):
     client.force_login(member_membership.user)
     response = client.get(reverse("workspaces:dashboard", args=["acme-social"]))
-    assert response.status_code == 200
-    body = response.content.decode()
+    assert response.status_code == 302
+    assert response.url == reverse("links:list", args=["acme-social"])
+    followed = client.get(response.url)
+    body = followed.content.decode()
     assert "Three steps to your first link" in body
     assert "Acme Social" in body
 

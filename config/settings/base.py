@@ -40,6 +40,32 @@ INVITE_RATE_PER_USER_WINDOW = env.int("INVITE_RATE_PER_USER_WINDOW", default=360
 # Slug availability check rate limit, enforced in apps.workspaces.views.check_slug.
 SLUG_CHECK_RATE = env.int("SLUG_CHECK_RATE", default=60)
 SLUG_CHECK_RATE_WINDOW = env.int("SLUG_CHECK_RATE_WINDOW", default=60)
+LINK_CODE_LENGTH = env.int("LINK_CODE_LENGTH", default=7)
+BLOCKED_LINK_DOMAINS = env.list("BLOCKED_LINK_DOMAINS", default=[])
+LINK_RATE_PER_USER = env.int("LINK_RATE_PER_USER", default=30)
+LINK_RATE_PER_USER_WINDOW = env.int("LINK_RATE_PER_USER_WINDOW", default=60)
+LINK_RATE_PER_WORKSPACE = env.int("LINK_RATE_PER_WORKSPACE", default=300)
+LINK_RATE_PER_WORKSPACE_WINDOW = env.int("LINK_RATE_PER_WORKSPACE_WINDOW", default=3600)
+# Short-code availability check rate limit: N checks per user per window seconds.
+LINK_CODE_CHECK_RATE = env.int("LINK_CODE_CHECK_RATE", default=60)
+LINK_CODE_CHECK_RATE_WINDOW = env.int("LINK_CODE_CHECK_RATE_WINDOW", default=60)
+LINK_METADATA_TIMEOUT = env.float("LINK_METADATA_TIMEOUT", default=5.0)
+LINK_METADATA_MAX_BYTES = env.int("LINK_METADATA_MAX_BYTES", default=2 * 1024 * 1024)
+# Overall wall-clock budget for a metadata fetch, across every redirect hop.
+LINK_METADATA_TOTAL_TIMEOUT = env.float("LINK_METADATA_TOTAL_TIMEOUT", default=10.0)
+# Maximum redirect hops a metadata fetch will follow before giving up.
+LINK_METADATA_MAX_REDIRECTS = env.int("LINK_METADATA_MAX_REDIRECTS", default=3)
+# Budget for resolving a single host, counted against LINK_METADATA_TOTAL_TIMEOUT.
+LINK_METADATA_DNS_TIMEOUT = env.float("LINK_METADATA_DNS_TIMEOUT", default=2.0)
+# Metadata lookup rate limits, separate from the outbound fetch limits above: cap how
+# often the dashboard may trigger a synchronous fetch at all, per user and per
+# workspace.
+LINK_METADATA_RATE = env.int("LINK_METADATA_RATE", default=20)
+LINK_METADATA_RATE_WINDOW = env.int("LINK_METADATA_RATE_WINDOW", default=60)
+LINK_METADATA_RATE_PER_WORKSPACE = env.int("LINK_METADATA_RATE_PER_WORKSPACE", default=60)
+LINK_METADATA_RATE_PER_WORKSPACE_WINDOW = env.int(
+    "LINK_METADATA_RATE_PER_WORKSPACE_WINDOW", default=60
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

@@ -1,0 +1,15 @@
+{% if error %}
+<p class="text-danger" role="alert">{{ error }}</p>
+{% else %}
+{% firstof title link.title "" as m_title %}
+{% firstof favicon_url link.favicon_url "" as m_favicon_url %}
+{% firstof og_description link.og_description "" as m_og_description %}
+{% if m_title or m_favicon_url %}
+<div class="flex items-center gap-2 text-[12.5px] text-ink-muted">
+  {% if m_favicon_url %}<img src="{{ m_favicon_url }}" alt="" class="h-4 w-4 rounded-sm">{% endif %}
+  <span>Fetched <strong class="text-ink">{{ m_title }}</strong>{% if m_og_description %} — {{ m_og_description }}{% endif %}</span>
+</div>
+{% else %}
+<p class="text-[12.5px] text-ink-muted">Nothing fetched yet. Enter a destination and we will pull its title and card automatically.</p>
+{% endif %}
+{% endif %}

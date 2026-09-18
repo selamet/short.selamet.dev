@@ -1,0 +1,33 @@
+<div id="link-{{ link.pk }}" class="flex flex-wrap items-center gap-4 border-b border-line px-4 py-3 last:border-b-0">
+  <span class="h-2 w-2 shrink-0 rounded-full {% if link.status == 'active' %}bg-ok{% elif link.status == 'archived' %}bg-ink-muted{% else %}bg-warn{% endif %}"
+        title="{{ link.get_status_display }}"></span>
+  <div class="min-w-0 flex-1">
+    <div class="flex items-center gap-2">
+      <span class="mono font-medium">{{ SHORT_DOMAIN }}/{{ link.code }}</span>
+    </div>
+    <div class="mt-1 flex min-w-0 items-center gap-2 text-ink-muted">
+      {% if link.favicon_url %}<img src="{{ link.favicon_url }}" alt="" class="h-3.5 w-3.5 shrink-0 rounded-sm">{% endif %}
+      <span class="truncate">{{ link.destination_url }}</span>
+    </div>
+    {% if link.tags.all %}
+    <div class="mt-1.5 flex flex-wrap gap-1">
+      {% for tag in link.tags.all %}<span class="rounded-full border border-line px-2 py-0.5 text-[11px] uppercase tracking-wide text-ink-muted">{{ tag.name }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  <span class="mono shrink-0 text-ink-muted">{{ link.click_count }} clicks</span>
+  <div class="flex shrink-0 items-center gap-2">
+    <button type="button" class="text-ink-muted hover:text-ink" data-copy="{{ link.short_url }}">Copy</button>
+    <a href="{% url 'links:edit' current_workspace.slug link.code %}" class="rounded-md border border-line px-3 py-1.5 font-medium hover:bg-surface-2">Edit</a>
+    {% if link.status == "archived" %}
+    <form method="post" action="{% url 'links:restore' current_workspace.slug link.code %}"
+          hx-post="{% url 'links:restore' current_workspace.slug link.code %}" hx-target="#link-{{ link.pk }}" hx-swap="outerHTML">
+      {% csrf_token %}
+      <button type="submit" class="rounded-md border border-line px-3 py-1.5 font-medium hover:bg-surface-2">Restore</button>
+    </form>
+    {% else %}
+    <button type="button" class="text-danger underline"
+            hx-get="{% url 'links:archive_confirm' current_workspace.slug link.code %}" hx-target="#modal">Archive</button>
+    {% endif %}
+  </div>
+</div>
