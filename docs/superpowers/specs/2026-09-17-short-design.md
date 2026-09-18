@@ -122,14 +122,14 @@ Tasks use Django 6's `django.tasks` (`@task`, `.enqueue()`). Backend: `Immediate
 | `generate_qr` | on demand | PNG + SVG to MEDIA, cached |
 | `import_links_csv` | bulk import confirmed | validate and create rows, progress on `ImportJob` |
 | `send_magic_link`, `send_invitation` | auth / invite | email sending, 3 retries |
-| `rebuild_daily_stats` | nightly 02:00 | recompute yesterday's rollups from raw events |
+| `rebuild_daily_stats` | nightly 02:00 | recompute yesterday's *and* the day before's rollups from raw events (redoing the previous day too catches a workspace west of UTC whose local "yesterday" was still open when this run's UTC date was chosen); refuses a day older than `CLICK_EVENT_RETENTION_DAYS` |
 | `expire_links` | every 10 min | disable links past `expires_at` or `max_clicks`, invalidate cache |
 | `purge_click_events` | nightly | delete events older than retention in batches |
-| `rotate_ip_salt` | nightly 00:00 | generate new daily salt, drop the previous one |
+| `rotate_ip_salt` | nightly 00:00 | make sure today's daily salt already exists; never replaces one already in use (see apps.core.privacy.ensure_daily_salt) |
 
-Scheduling: `django.tasks` has no scheduler. `supercronic` runs inside the worker container and calls `manage.py enqueue_scheduled <task>`; cron only triggers, work runs in the worker with retry semantics.
+Scheduling: `django.tasks` has no scheduler. `supercronic` runs inside the worker container and calls `manage.py enqueue_scheduled <task>`; cron only triggers, the worker runs the actual work.
 
-Error handling: tasks are idempotent (ClickEvent duplicate check on `link_id + occurred_at + ip_hash`, rollups are upserts). Retries: 3 attempts with exponential backoff. Permanent failures go to Sentry.
+Error handling: tasks are idempotent where noted (rollups are upserts; `record_click` is the exception -- see its own docstring). Retries: 3 attempts with exponential backoff, where a task explicitly implements it (`send_magic_link`, `send_invitation`). The four scheduled analytics/maintenance tasks above (`rebuild_daily_stats`, `expire_links`, `purge_click_events`, `rotate_ip_salt`) do not retry: the production task backend (`django_tasks_db`) has no retry layer, so a failed run is logged and simply waits for the next scheduled run to catch up. Permanent failures go to Sentry.
 
 ## 6. API and auth
 

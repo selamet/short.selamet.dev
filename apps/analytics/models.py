@@ -1,6 +1,19 @@
 from django.db import models
 
 
+class Dimension(models.TextChoices):
+    COUNTRY = "country", "Country"
+    CITY = "city", "City"
+    REFERRER = "referrer", "Referrer"
+    DEVICE = "device", "Device"
+    OS = "os", "Operating system"
+    BROWSER = "browser", "Browser"
+    UTM_SOURCE = "utm_source", "UTM source"
+    UTM_MEDIUM = "utm_medium", "UTM medium"
+    UTM_CAMPAIGN = "utm_campaign", "UTM campaign"
+    TARGET_PLATFORM = "target_platform", "Target platform"
+
+
 class ClickEvent(models.Model):
     """One redirect served. Raw addresses are never stored, only a daily-salted hash.
 
@@ -43,3 +56,100 @@ class ClickEvent(models.Model):
 
     def __str__(self):
         return f"click {self.link_id} @ {self.occurred_at:%Y-%m-%d %H:%M}"
+
+
+class DailyLinkStat(models.Model):
+    """One row per link per day. The dashboard reads these, never the raw events."""
+
+    link = models.ForeignKey("links.Link", on_delete=models.CASCADE, related_name="daily_stats")
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_stats"
+    )
+    date = models.DateField()
+    clicks = models.PositiveIntegerField(default=0)
+    unique_clicks = models.PositiveIntegerField(default=0)
+    bot_clicks = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-date"]
+        constraints = [
+            models.UniqueConstraint(fields=["link", "date"], name="analytics_daily_stat_unique")
+        ]
+        indexes = [models.Index(fields=["workspace", "-date"])]
+
+    def __str__(self):
+        return f"stats {self.link_id} @ {self.date}"
+
+
+class DailyLinkBreakdown(models.Model):
+    """One row per link, day, dimension and value."""
+
+    link = models.ForeignKey(
+        "links.Link", on_delete=models.CASCADE, related_name="daily_breakdowns"
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_breakdowns"
+    )
+    date = models.DateField()
+    dimension = models.CharField(max_length=20, choices=Dimension.choices)
+    value = models.CharField(max_length=255)
+    clicks = models.PositiveIntegerField(default=0)
+    bot_clicks = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["-clicks"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["link", "date", "dimension", "value"],
+                name="analytics_daily_breakdown_unique",
+            )
+        ]
+        # (workspace, dimension, date), not (workspace, date, dimension): every
+        # reader of this table (apps.analytics.queries.breakdown) filters by
+        # workspace and dimension together and only then narrows by date range, so
+        # this ordering lets a single index seek straight into one dimension's rows
+        # before it ever has to consider the date range, instead of scanning every
+        # dimension's rows for the date range first.
+        indexes = [models.Index(fields=["workspace", "dimension", "date"])]
+
+    def __str__(self):
+        return f"breakdown {self.link_id} @ {self.date} {self.dimension}={self.value}"
+
+
+class DailyClickIdentity(models.Model):
+    """One row per link, day and visitor identity (a hash of ip_hash + user_agent).
+
+    Exists solely so "is this click unique today" is an atomic INSERT against this
+    table's own unique constraint, rather than a read-then-decide query that two
+    concurrent workers could both pass at once (see apps.analytics.rollups
+    ._claim_identity). Purged together with the raw ClickEvent rows it is derived
+    from; it carries no information a rebuild cannot regenerate.
+    """
+
+    link = models.ForeignKey(
+        "links.Link", on_delete=models.CASCADE, related_name="daily_identities"
+    )
+    workspace = models.ForeignKey(
+        "workspaces.Workspace", on_delete=models.CASCADE, related_name="daily_identities"
+    )
+    date = models.DateField()
+    identity = models.CharField(max_length=64)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["link", "date", "identity"], name="analytics_daily_identity_unique"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["workspace", "date"]),
+            # purge_click_events deletes by `date` alone (see
+            # apps.analytics.tasks._delete_in_batches), with no workspace or link in
+            # its filter, so it needs its own index rather than relying on the
+            # (workspace, date) one above, whose leading column that query never
+            # supplies.
+            models.Index(fields=["date"], name="analytics_identity_date_idx"),
+        ]
+
+    def __str__(self):
+        return f"identity {self.link_id} @ {self.date} {self.identity[:8]}"

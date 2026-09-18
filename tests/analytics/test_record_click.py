@@ -33,6 +33,8 @@ def _record(
         "referrer_host": referrer_host,
         "referrer_url": referrer_url,
         "target_platform": "desktop",
+        "country": "",
+        "city": "",
         **attribution.utm_from_query_string(query_string),
     }
     payload.update(overrides)
@@ -55,6 +57,22 @@ def test_record_click_writes_an_event_and_increments_the_counter(link):
     assert event.is_bot is False
     link.refresh_from_db()
     assert link.click_count == 1
+
+
+@pytest.mark.django_db
+def test_country_and_city_land_on_the_event_when_given(link):
+    _record(link, country="US", city="Springfield")
+    event = ClickEvent.objects.get()
+    assert event.country == "US"
+    assert event.city == "Springfield"
+
+
+@pytest.mark.django_db
+def test_country_and_city_stay_blank_when_geography_is_not_resolved(link):
+    _record(link)
+    event = ClickEvent.objects.get()
+    assert event.country == ""
+    assert event.city == ""
 
 
 @pytest.mark.django_db
@@ -163,6 +181,8 @@ def test_a_deleted_link_is_skipped_quietly(link, caplog):
         referrer_host="",
         referrer_url="",
         target_platform="desktop",
+        country="",
+        city="",
         **attribution.utm_from_query_string(""),
     )
     assert ClickEvent.objects.count() == 0

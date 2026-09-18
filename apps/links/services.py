@@ -69,6 +69,14 @@ def _invalidate_on_commit(*codes):
     transaction.on_commit(_invalidate)
 
 
+def invalidate_cache(*codes):
+    """Public entry point onto _invalidate_on_commit for callers outside this app
+    (see apps.analytics.tasks.expire_links). The leading underscore on that helper is
+    this module's own signal that it is not meant to be imported elsewhere; a
+    cross-app caller gets this name instead of reaching past that signal itself."""
+    _invalidate_on_commit(*codes)
+
+
 def code_available(code, exclude=None):
     code = code_utils.normalize_code(code)
     query = Link.objects.filter(code=code)

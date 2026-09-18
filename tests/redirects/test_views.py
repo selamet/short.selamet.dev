@@ -234,6 +234,34 @@ def test_a_hashing_failure_still_enqueues_the_click_with_an_empty_ip_hash(
 
 
 @pytest.mark.django_db
+def test_click_recording_passes_country_and_city_through_to_the_task(link, monkeypatch):
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    monkeypatch.setattr(
+        "apps.redirects.views.geo.lookup", lambda ip: {"country": "US", "city": "Springfield"}
+    )
+    client_get(link.code)
+    assert len(calls) == 1
+    _args, kwargs = calls[0]
+    assert kwargs["country"] == "US"
+    assert kwargs["city"] == "Springfield"
+
+
+@pytest.mark.django_db
+def test_click_recording_leaves_geography_blank_when_it_is_not_configured(link, monkeypatch):
+    # No GEOIP_PATH is set in the test settings, so geo.lookup() itself already
+    # returns blanks; nothing about the view changes as a result.
+    calls = []
+    monkeypatch.setattr("apps.redirects.views.record_click", _recorder(calls))
+    response = client_get(link.code)
+    assert response.status_code == 302
+    assert len(calls) == 1
+    _args, kwargs = calls[0]
+    assert kwargs["country"] == ""
+    assert kwargs["city"] == ""
+
+
+@pytest.mark.django_db
 def test_click_recording_strips_credentials_and_the_query_string_before_enqueuing(
     link, monkeypatch
 ):

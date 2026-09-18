@@ -16,7 +16,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import render
 from django.utils import timezone
 
-from apps.analytics import attribution
+from apps.analytics import attribution, geo
 from apps.analytics.tasks import record_click
 from apps.core.http import client_ip
 from apps.core.privacy import hash_ip
@@ -70,6 +70,16 @@ def _hashed_client_ip(request):
         return ""
 
 
+def _resolved_geography(request):
+    # Resolved here, beside the hashing, not in the task: the raw address must never
+    # reach the task queue (see _hashed_client_ip above), and this is the last point
+    # in the pipeline that still has it. geo.lookup() already reduces every failure
+    # -- GEOIP_PATH left empty, a database that failed to open, an address it has no
+    # entry for -- to blanks and logs internally, so nothing here needs its own
+    # try/except.
+    return geo.lookup(client_ip(request))
+
+
 def _record(request, resolution):
     # Split here, not in the task: the production task backend persists its arguments
     # to the database, and the raw referrer (which can carry credentials in its
@@ -78,6 +88,7 @@ def _record(request, resolution):
         request.META.get("HTTP_REFERER", "")[:1024]
     )
     utm = attribution.utm_from_query_string(request.META.get("QUERY_STRING", "")[:1024])
+    geography = _resolved_geography(request)
     try:
         record_click.enqueue(
             resolution.link_id,
@@ -87,6 +98,8 @@ def _record(request, resolution):
             referrer_host=referrer_host,
             referrer_url=referrer_url,
             target_platform=resolution.platform,
+            country=geography["country"],
+            city=geography["city"],
             **utm,
         )
     except Exception:

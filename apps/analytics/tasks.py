@@ -1,20 +1,28 @@
 """Click recording: writes one ClickEvent per served redirect, off the request path.
 
-Geographic resolution (country and city) is deliberately left blank here; GeoLite2
-lookup belongs to the analytics issue that owns that database and its licensing.
+Geographic resolution happens in the view, not here (see apps.redirects.views._record
+and apps.analytics.geo): the raw address never reaches this task, and by the time an
+address has been resolved to a country and city it is no longer needed, so `country`
+and `city` arrive already resolved, as two short strings.
 """
 
 import logging
+from datetime import date, timedelta
 
+from django.conf import settings
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, Q
 from django.tasks import task
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
+from apps.core import privacy
+from apps.links import services as link_services
 from apps.links.models import Link
 
-from . import useragent
-from .models import ClickEvent
+from . import rollups, useragent
+from .models import ClickEvent, DailyClickIdentity
+from .queries import padded_utc_window
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +54,8 @@ def record_click(
     utm_content,
     utm_term,
     target_platform,
+    country,
+    city,
 ):
     """Record one click. Takes `referrer_host`/`referrer_url` and the five UTM values
     already split out of the raw referrer and query string (see
@@ -58,12 +68,18 @@ def record_click(
     does not retry a task today; worth revisiting if that changes.
     """
     try:
-        link = Link.objects.get(pk=link_id)
+        # select_related: rollups.apply_event() below reads event.workspace (for the
+        # day's timezone and to stamp the rollup rows); without this, that would be a
+        # second query on every single click, since ClickEvent.objects.create() below
+        # is given workspace_id, not the workspace object.
+        link = Link.objects.select_related("workspace").get(pk=link_id)
     except Link.DoesNotExist:
         logger.warning("click recording skipped: link_id=%s no longer exists", link_id)
         return
     string_fields = {
         "ip_hash": ip_hash,
+        "country": country,
+        "city": city,
         "device_type": useragent.device_type(user_agent),
         "os": useragent.operating_system(user_agent),
         "browser": useragent.browser(user_agent),
@@ -81,17 +97,236 @@ def record_click(
     # increment happens after, outside the transaction, since it is best-effort and a
     # cache outage must never roll back a successful write.
     with transaction.atomic():
-        ClickEvent.objects.create(
+        event = ClickEvent.objects.create(
             link=link,
-            workspace_id=link.workspace_id,
+            workspace=link.workspace,
             occurred_at=parse_datetime(occurred_at),
             is_bot=useragent.is_bot(user_agent),
             **{name: _truncated(name, value) for name, value in string_fields.items()},
         )
         Link.objects.filter(pk=link_id).update(click_count=F("click_count") + 1)
+        try:
+            # Its own savepoint, not just a try/except: an exception raised while the
+            # outer atomic() block is still open would otherwise poison it (Postgres
+            # refuses any further query on a transaction that hit a database error),
+            # which would lose the ClickEvent and the counter update above along with
+            # the rollup. The nested atomic() rolls back only the rollup's own writes
+            # on failure, leaving the outer transaction free to commit.
+            with transaction.atomic():
+                rollups.apply_event(event)
+        except Exception:
+            # The event and the counter above are what matters; losing today's rollup
+            # for this one click is recoverable (the nightly rebuild recomputes the day
+            # from raw events), losing the click itself is not, so a rollup failure is
+            # logged and swallowed rather than allowed to roll back the write above.
+            logger.exception("rollup failed for click on link_id=%s", link_id)
     # Imported lazily to keep the app dependency one-directional: apps.redirects
     # already imports apps.analytics.tasks (to enqueue this very task), so a
     # module-level import here would be circular.
     from apps.redirects import cache as redirect_cache
 
     redirect_cache.bump_click_count(link.code, seed=link.click_count)
+
+
+# The four scheduled jobs below (expire_links included) all live in this module,
+# rather than each in the app that owns the model it touches: they are only ever
+# enqueued together, by the same crontab (see docker/crontab), and there is exactly
+# one place an operator needs to look to see everything that runs on a schedule.
+# expire_links is a link concern in every other sense -- see apps.links.services for
+# the rest of that lifecycle -- but a scheduled one, and that outweighs app purity
+# here.
+
+
+def _coerce_day(day):
+    """Accept either a date (the natural type for a direct call, e.g. from a shell)
+    or an ISO date string (what a JSON-serializing task backend, such as
+    django_tasks_db in production, hands back on execution) -- the same trade-off
+    record_click() above makes for occurred_at."""
+    if day is None or isinstance(day, date):
+        return day
+    return date.fromisoformat(day)
+
+
+@task
+def rebuild_daily_stats(day=None):
+    """Recompute DailyLinkStat, DailyLinkBreakdown and DailyClickIdentity for `day`
+    (UTC yesterday by default) and for `day - 1`, for every link with at least one
+    click that day, correcting anything the incremental path in
+    rollups.apply_event() might have missed. Meant to run once a night; also
+    callable with an explicit date (a date or an ISO string) to repair or backfill a
+    single day (and the day before it).
+
+    Redoing `day - 1` as well as `day` matters for a workspace west of UTC: this
+    job's default `day` is UTC "yesterday", but a workspace several hours behind UTC
+    (say, US Pacific) has its own local "yesterday" still open when a run picks that
+    UTC date -- some of its clicks for that local day have not happened yet. Only
+    ever rebuilding `day` would then leave that workspace's local day exactly as the
+    incremental path left it forever: by the time tomorrow's run rolls `day` forward
+    to what is now that local day's UTC date, the incremental path has already had a
+    full day to run against it with nothing to correct it, and the run after that
+    has already moved on. Rebuilding `day - 1` too means the very next run, one day
+    later, corrects it -- at the cost of one extra day of (idempotent) work every
+    night.
+
+    Each workspace picks its own timezone (Workspace.timezone), so which raw
+    ClickEvent rows actually fall on a given day differs link by link. Rather than
+    duplicating that per-workspace conversion here, this scans every event in a
+    window wide enough to cover any timezone offset (see
+    apps.analytics.queries.padded_utc_window, shared with hour_weekday_matrix()
+    there) and asks rollups.local_date() -- the same function apply_event() itself
+    uses -- which day each one lands on.
+    """
+    day = _coerce_day(day) or (timezone.now().date() - timedelta(days=1))
+    for target_day in (day - timedelta(days=1), day):
+        _rebuild_daily_stats_for_day(target_day)
+
+
+def _rebuild_daily_stats_for_day(day):
+    retention_floor = timezone.now().date() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
+    if day < retention_floor:
+        # purge_click_events has already deleted (or soon will delete) this day's raw
+        # ClickEvent rows; rebuilding it would find none of them and overwrite its
+        # existing rollups with all-zero totals instead of leaving them alone -- the
+        # rollups are the entire point of keeping them once the raw events behind
+        # them are gone (see purge_click_events's own docstring).
+        logger.warning(
+            "rebuild_daily_stats day=%s refused: older than CLICK_EVENT_RETENTION_DAYS=%d, its "
+            "raw events are already purged",
+            day,
+            settings.CLICK_EVENT_RETENTION_DAYS,
+        )
+        return
+    window_start, window_end = padded_utc_window(day, day)
+    candidates = ClickEvent.objects.filter(
+        occurred_at__gte=window_start, occurred_at__lt=window_end
+    ).select_related("workspace")
+    link_ids = {
+        event.link_id for event in candidates.iterator() if rollups.local_date(event) == day
+    }
+    for link in Link.objects.filter(pk__in=link_ids).select_related("workspace"):
+        rollups.rebuild(link, day)
+    logger.info("rebuild_daily_stats day=%s links=%d", day, len(link_ids))
+
+
+def _delete_in_batches(queryset, batch_size, max_batches=None):
+    """Delete every row `queryset` matches, `batch_size` rows at a time, so clearing
+    a large backlog never holds one long-running DELETE (and its locks) for the
+    whole set. Returns the total number of rows removed.
+
+    Stops after `max_batches` batches when given, leaving whatever is left for the
+    next scheduled run instead of running unbounded against a large backlog (see
+    ANALYTICS_PURGE_MAX_BATCHES and purge_click_events below) -- the serial db_worker
+    this runs on has nothing else to record clicks or run any other scheduled job
+    while one purge call is still going.
+    """
+    model = queryset.model
+    total = 0
+    batches = 0
+    while max_batches is None or batches < max_batches:
+        ids = list(queryset.order_by("pk").values_list("pk", flat=True)[:batch_size])
+        if not ids:
+            return total
+        deleted, _ = model.objects.filter(pk__in=ids).delete()
+        total += deleted
+        batches += 1
+    if queryset.exists():
+        logger.warning(
+            "purge of %s stopped early after %d batches (ANALYTICS_PURGE_MAX_BATCHES=%d); "
+            "rows remain for the next scheduled run",
+            model.__name__,
+            batches,
+            max_batches,
+        )
+    return total
+
+
+@task
+def purge_click_events():
+    """Delete ClickEvent rows older than CLICK_EVENT_RETENTION_DAYS, and the
+    DailyClickIdentity rows for the same cutoff date, in batches of
+    ANALYTICS_PURGE_BATCH_SIZE, up to ANALYTICS_PURGE_MAX_BATCHES batches per table
+    per run. DailyLinkStat and DailyLinkBreakdown are never touched here: they are
+    the entire point of keeping rollups once the raw events behind them are gone.
+
+    DailyClickIdentity carries no foreign key to ClickEvent (see its docstring in
+    apps.analytics.models: it exists purely so rollups._claim_identity() has
+    something to race an INSERT against, keyed by (link, date, identity), not by
+    event), so deleting ClickEvent rows never cascades into it -- it has to be
+    purged here explicitly, by the same cutoff, or it would grow forever.
+    """
+    cutoff = timezone.now() - timedelta(days=settings.CLICK_EVENT_RETENTION_DAYS)
+    batch_size = settings.ANALYTICS_PURGE_BATCH_SIZE
+    max_batches = settings.ANALYTICS_PURGE_MAX_BATCHES
+    events_deleted = _delete_in_batches(
+        ClickEvent.objects.filter(occurred_at__lt=cutoff), batch_size, max_batches
+    )
+    identities_deleted = _delete_in_batches(
+        DailyClickIdentity.objects.filter(date__lt=cutoff.date()), batch_size, max_batches
+    )
+    logger.info(
+        "purge_click_events cutoff=%s events=%d identities=%d",
+        cutoff.date(),
+        events_deleted,
+        identities_deleted,
+    )
+
+
+@task
+def rotate_ip_salt():
+    """Make sure today's IP-hashing salt (apps.core.privacy) already exists in the
+    cache right at midnight, rather than only lazily on the day's first click.
+
+    Despite the name, this never replaces a salt already in use (see
+    apps.core.privacy.ensure_daily_salt): a salt that gets replaced out from under
+    clicks already hashed against it is exactly the bug this job used to cause --
+    one visitor, salted two different ways either side of the "rotation", counted as
+    two unique clicks. Kept as `rotate_ip_salt` (not renamed) because the crontab
+    entry, the enqueue_scheduled command and the spec's task table all name it, and
+    a scheduled job's name is its interface.
+    """
+    privacy.ensure_daily_salt()
+
+
+@task
+def expire_links():
+    """Disable every active link that has passed its expires_at or reached
+    max_clicks, invalidating each one's cached redirect payload through
+    apps.links.services.invalidate_cache rather than reaching into the redirect
+    cache directly, so this stays the one place that knows how that cache entry
+    gets cleared.
+
+    The primary keys of the links to disable are captured first, then the UPDATE is
+    issued against exactly that list (`pk__in`), never by re-running the
+    expires_at/max_clicks filter a second time. Re-running it would race: a link
+    that only becomes eligible in the gap between the two statements (a click
+    landing right as this runs, pushing click_count past max_clicks) would then be
+    disabled by an update() that re-evaluated the filter, without its code ever
+    having been captured for invalidate_cache -- disabled, but still serving its
+    old cached payload until the cache entry's own TTL expires. Scoping the update
+    to the captured primary keys instead means exactly the links that get disabled
+    are exactly the ones invalidated, every time; a link that turns eligible mid-run
+    is simply left for the next run (this job runs every 10 minutes, see
+    docker/crontab) rather than raced.
+
+    The UPDATE also repeats `status=Link.Status.ACTIVE`, not just `pk__in`: a link
+    archived (or otherwise moved off ACTIVE) by someone in the gap between the read
+    above and this statement must be left exactly as they left it, not flipped to
+    DISABLED underneath them. Without this, `pk__in` alone matches it regardless of
+    its current status and resurrects it from ARCHIVED to a merely-disabled state --
+    a real change to what the link is, not just a miscount.
+    """
+    now = timezone.now()
+    with transaction.atomic():
+        due = Link.objects.filter(status=Link.Status.ACTIVE).filter(
+            Q(expires_at__lt=now) | Q(max_clicks__isnull=False, click_count__gte=F("max_clicks"))
+        )
+        pks_and_codes = list(due.values_list("pk", "code"))
+        if not pks_and_codes:
+            return
+        pks = [pk for pk, _code in pks_and_codes]
+        codes = [code for _pk, code in pks_and_codes]
+        updated = Link.objects.filter(pk__in=pks, status=Link.Status.ACTIVE).update(
+            status=Link.Status.DISABLED
+        )
+    link_services.invalidate_cache(*codes)
+    logger.info("expire_links disabled=%d", updated)

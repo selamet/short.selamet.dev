@@ -1,0 +1,5 @@
+0 2 * * * python manage.py enqueue_scheduled rebuild_daily_stats
+30 2 * * * python manage.py enqueue_scheduled purge_click_events
+0 0 * * * python manage.py enqueue_scheduled rotate_ip_salt
+*/10 * * * * python manage.py enqueue_scheduled expire_links
+0 3 * * * python manage.py prune_db_task_results

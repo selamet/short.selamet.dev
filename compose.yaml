@@ -19,14 +19,17 @@ services:
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       TASKS_BACKEND: django_tasks_db.backend.DatabaseBackend
-    # django-tasks-db never prunes its own result rows, so a small loop runs the
-    # prune command once a day alongside the worker, in the same container, without
-    # pulling in a scheduler (there is none in this stack) for a single periodic job.
+    # supercronic runs docker/crontab in the background, which only ever enqueues
+    # the scheduled analytics/maintenance jobs (see apps.analytics.tasks and
+    # apps.analytics.management.commands.enqueue_scheduled) and the django-tasks-db
+    # prune -- nothing schedules itself inside the web process. The worker itself is
+    # exec'd, not started as a second background job, so it keeps PID 1's signal
+    # handling and still shuts down cleanly on `docker stop`.
     command:
       - sh
       - -c
       - |
-        (while true; do sleep 86400; python manage.py prune_db_task_results; done) &
+        supercronic /app/docker/crontab &
         exec python manage.py db_worker
     volumes:
       - media:/data/media
