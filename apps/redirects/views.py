@@ -1,7 +1,11 @@
 """The redirect hot path.
 
 These are plain functions rather than class-based views, called from the middleware
-before the rest of the stack runs. Nothing here writes to the database.
+before the rest of the stack runs. The only write this path makes is the click
+enqueue in `_record`: in production, the task backend is a database table, so
+enqueuing is itself a synchronous INSERT inside the request. That write is accepted
+rather than avoided — the alternative would be a task queue this project does not
+have — so nothing else here should add a second one.
 """
 
 import logging

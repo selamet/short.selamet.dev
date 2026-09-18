@@ -101,7 +101,7 @@ Unique click definition: same `ip_hash` + `user_agent` for the same link within 
 4. Target selection: detect platform from the user agent (ios/android/desktop). Use the matching `LinkTarget.url` if present, otherwise `destination_url`. Append stored UTM parameters without overriding parameters already present on the destination.
 5. If the selected target has `app_url`, return a small `noindex` HTML page that attempts the deep link and falls back to `fallback_url` after 1.5 s.
 6. Expiry (`expires_at`, `max_clicks`) is checked against cached values; expired links render the "link expired" page.
-7. Enqueue `record_click(link_id, occurred_at, ip, user_agent, referrer, query_string, target_platform)`. This call never blocks the redirect.
+7. Enqueue `record_click(link_id, occurred_at, ip_hash, user_agent, referrer_host, referrer_url, utm_source, utm_medium, utm_campaign, utm_content, utm_term, target_platform)` — the view hashes the IP and splits the referrer/query string before enqueuing, so the task never receives a raw address, credentials or an unbounded query string. This call never blocks the redirect, but it is not free: in production the task backend is a database table, so enqueuing is a synchronous INSERT inside the request — the one write this path makes, accepted because a real task queue is not part of this project.
 8. Return `302 Found` (never 301, so every click is measured).
 
 Social crawlers (facebookexternalhit, Twitterbot, WhatsApp, Slackbot, LinkedInBot, TelegramBot, Discordbot) receive an HTML page containing only the OG meta tags instead of a redirect. These requests are not counted as clicks. Other bot detection happens in the task, not the view.
