@@ -172,7 +172,7 @@ Total custom JS: roughly 100 lines. No bundler.
 
 - Destination validation in the service layer: only `http`/`https`; reject the short domain itself, private IP ranges and `localhost`; OG fetch re-checks the resolved IP and follows at most 3 redirects. Domain blocklist from env and admin.
 - Optional Google Safe Browsing check via task when `SAFE_BROWSING_API_KEY` is set.
-- Rate limits (Redis fixed window, cache `add` + `incr`): magic link 3/email/10 min and 20/IP/hour; link creation 30/user/min and 120/key/min; redirect 20/IP/s; slug availability 60/user/min.
+- Rate limits (Redis fixed window, cache `add` + `incr`): magic link 3/email/10 min and 20/IP/hour; link creation 30/user/min, 300/workspace/hour and 120/key/min (per-key limit pending the API issue); redirect 20/IP/s; slug availability 60/user/min.
 - Short codes: 7-char base62 generated with `secrets`; unknown codes are negatively cached.
 - Privacy: IPs are never stored raw, only hashed with a daily salt kept until the end of the day plus a one-hour grace. User agents truncated to 256 chars. Referrer query strings dropped. Raw click events purged after retention. Deleting a user keeps workspace links with `created_by = NULL`.
 - `client_ip` trusts only the `TRUSTED_PROXY_HOPS` entries closest to the app in `X-Forwarded-For`, so a client-supplied prefix can't be used to spoof the address rate limits key on.
