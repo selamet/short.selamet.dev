@@ -1,0 +1,23 @@
+{% load static %}<!doctype html>
+<html lang="en" data-theme="system">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}{{ SITE_NAME }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+</head>
+<body>
+  <main class="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-4 py-12">
+    <p class="mono text-accent text-[13px]" aria-hidden="true">»</p>
+    <section class="mt-4 rounded-lg border border-line bg-surface p-6 shadow-e1">
+      {% block content %}{% endblock %}
+    </section>
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

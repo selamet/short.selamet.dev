@@ -90,6 +90,10 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Ordering is the point: short-code paths are claimed here, before session, CSRF,
+    # authentication or messages middleware ever run, so a click never pays for any of
+    # that work.
+    "apps.redirects.middleware.RedirectMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

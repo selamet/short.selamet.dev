@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ resolution.og.title|default:SITE_NAME }}</title>
+  <meta property="og:title" content="{{ resolution.og.title|default:SITE_NAME }}">
+  <meta property="og:description" content="{{ resolution.og.description }}">
+  {% if resolution.og.image %}<meta property="og:image" content="{{ resolution.og.image }}">{% endif %}
+  <meta property="og:url" content="{{ resolution.url }}">
+  <meta name="twitter:card" content="summary_large_image">
+</head>
+<body>
+  <h1>{{ resolution.og.title|default:SITE_NAME }}</h1>
+  {% if resolution.og.description %}<p>{{ resolution.og.description }}</p>{% endif %}
+  <a href="{{ resolution.url }}">{{ resolution.url }}</a>
+</body>
+</html>

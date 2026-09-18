@@ -12,3 +12,5 @@ urlpatterns = [
     path("", core_views.home, name="home"),
     path("health/", core_views.health, name="health"),
 ]
+# Single-segment paths (e.g. /spring-drop, /spring-drop+) are short links: they never
+# reach this URLconf because RedirectMiddleware serves them before the resolver runs.

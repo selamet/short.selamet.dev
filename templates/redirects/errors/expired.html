@@ -1,0 +1,7 @@
+{% extends "redirects/_base.html" %}
+{% block title %}Link expired · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<p class="mono text-danger" aria-hidden="true">410</p>
+<h1 class="mt-2 text-[20px] font-semibold leading-tight">This link has expired</h1>
+<p class="mt-2 text-ink-muted">The owner set an expiry date and it has passed.</p>
+{% endblock %}

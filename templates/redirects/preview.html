@@ -1,0 +1,26 @@
+{% extends "redirects/_base.html" %}
+{% block title %}{{ code }} · link preview · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="flex items-center gap-2">
+  <span class="mono text-accent">»</span>
+  <span class="font-semibold">{{ SITE_NAME }}</span>
+  <span class="ml-auto mono text-[11px] text-ink-muted">link preview</span>
+</div>
+<p class="mt-4 text-[11.5px] text-ink-muted">You're about to visit</p>
+<p class="mt-1 mono break-all">{{ resolution.url }}</p>
+{% if resolution.og.title or resolution.og.image %}
+<div class="mt-4 overflow-hidden rounded-md border border-line">
+  {% if resolution.og.image %}<img src="{{ resolution.og.image }}" alt="" class="h-32 w-full object-cover">{% endif %}
+  <div class="p-3">
+    {% if resolution.og.title %}<p class="font-semibold">{{ resolution.og.title }}</p>{% endif %}
+    {% if resolution.og.description %}<p class="mt-1 text-ink-muted">{{ resolution.og.description }}</p>{% endif %}
+  </div>
+</div>
+{% endif %}
+<p class="mt-4 text-ink-muted">Short code <span class="mono text-ink">{{ code }}</span></p>
+<a href="/{{ code }}" rel="noopener nofollow"
+   class="mt-6 inline-block rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">
+  Continue →
+</a>
+<p class="mt-4 text-[11px] text-ink-muted">Add a <span class="mono">+</span> to any short link to see this page instead of being redirected.</p>
+{% endblock %}
