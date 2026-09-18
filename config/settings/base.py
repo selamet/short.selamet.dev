@@ -69,6 +69,9 @@ LINK_METADATA_RATE_PER_WORKSPACE_WINDOW = env.int(
 REDIRECT_CACHE_TTL = env.int("REDIRECT_CACHE_TTL", default=3600)
 REDIRECT_MISS_TTL = env.int("REDIRECT_MISS_TTL", default=60)
 DEEP_LINK_FALLBACK_MS = env.int("DEEP_LINK_FALLBACK_MS", default=1500)
+# How long ClickEvent rows are kept before the retention purge task (owned by the
+# analytics issue) deletes them.
+CLICK_EVENT_RETENTION_DAYS = env.int("CLICK_EVENT_RETENTION_DAYS", default=90)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

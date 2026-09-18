@@ -77,3 +77,18 @@ def invalidate(code):
         cache.delete(key_for(code))
     except Exception:
         logger.warning("cache unavailable while invalidating %s", code, exc_info=True)
+
+
+def bump_click_count(code):
+    """Nudge a cached payload's click_count by one so the resolver's expiry check sees
+    a click that just happened without waiting for the entry to expire and reload from
+    PostgreSQL. A no-op when nothing is cached for this code, including a cached miss.
+
+    Reads and writes go through get_payload/set_payload, so a cache outage is already
+    swallowed there and never raises here either.
+    """
+    payload = get_payload(code)
+    if payload is None or payload == MISS:
+        return
+    payload["click_count"] = payload.get("click_count", 0) + 1
+    set_payload(code, payload)
