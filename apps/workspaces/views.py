@@ -79,7 +79,7 @@ def check_slug(request):
 @require_role()
 @require_GET
 def dashboard(request, slug):
-    return render(request, "workspaces/dashboard.html")
+    return redirect("links:list", slug=slug)
 
 
 @login_required

@@ -1,5 +1,37 @@
 {% extends "dashboard/base.html" %}
 {% block title %}Links · {{ current_workspace.name }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<p class="text-ink-muted">The links list arrives with the next release.</p>
+<div class="flex items-center justify-between gap-4">
+  <h1 class="text-[20px] font-semibold">{{ current_workspace.name }}</h1>
+  <a href="{% url 'links:create' current_workspace.slug %}"
+     class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">New link</a>
+</div>
+
+{% if not has_any %}
+<section class="mt-6 rounded-lg border border-line bg-surface p-6">
+  <p class="text-[11.5px] font-medium uppercase tracking-wide text-ink-muted">Guided empty dashboard</p>
+  <h2 class="mt-2 text-[15px] font-semibold">Three steps to your first link</h2>
+  <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+    <li class="rounded-md border border-line p-4"><span class="mono text-accent">1</span><p class="mt-2 font-medium">Paste a destination URL</p><p class="text-ink-muted">We fetch the title, favicon and social card automatically.</p></li>
+    <li class="rounded-md border border-line p-4"><span class="mono text-ink-muted">2</span><p class="mt-2 font-medium">Pick a preset</p><p class="text-ink-muted">Instagram bio, TikTok, newsletter — UTMs are filled for you.</p></li>
+    <li class="rounded-md border border-line p-4"><span class="mono text-ink-muted">3</span><p class="mt-2 font-medium">Copy and post it</p><p class="text-ink-muted">Clicks start showing in analytics within seconds.</p></li>
+  </ol>
+  <form method="post" action="{% url 'links:create' current_workspace.slug %}" class="mt-6 flex gap-2">
+    {% csrf_token %}
+    <input type="text" name="destination_url" placeholder="https://example.com/page" required
+           class="flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+    <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Create your first link</button>
+  </form>
+</section>
+{% else %}
+<form method="post" action="{% url 'links:create' current_workspace.slug %}" class="mt-6 flex gap-2">
+  {% csrf_token %}
+  <input type="text" name="destination_url" placeholder="https://example.com/page" required
+         class="flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none">
+  <button type="submit" class="rounded-md bg-accent px-4 py-2 font-semibold text-white hover:bg-accent-hover">Create</button>
+</form>
+
+{% include "links/partials/filters.html" %}
+<div class="mt-4">{% include "links/partials/rows.html" %}</div>
+{% endif %}
 {% endblock %}

@@ -1,5 +1,8 @@
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from apps.core import ratelimit
@@ -8,7 +11,7 @@ from apps.workspaces.permissions import require_role
 from . import codes as code_utils
 from . import services, utm
 from .forms import LinkForm, target_rows
-from .models import Link
+from .models import Link, Tag
 
 CARD_PLATFORMS = {"whatsapp": "WhatsApp", "x": "X", "linkedin": "LinkedIn", "slack": "Slack"}
 
@@ -198,6 +201,73 @@ def card_preview(request, slug):
 @require_role()
 @require_GET
 def link_list(request, slug):
-    # Placeholder until Task 4 lands the full list view with filters and pagination;
-    # create/edit redirect here so it must resolve, even though it renders a stub for now.
-    return render(request, "links/list.html", {})
+    query = (
+        Link.objects.filter(workspace=request.workspace)
+        .prefetch_related("tags", "targets")
+        .order_by("-created_at")
+    )
+    status = request.GET.get("status", Link.Status.ACTIVE)
+    if status in Link.Status.values:
+        query = query.filter(status=status)
+    tag = request.GET.get("tag", "")
+    if tag:
+        query = query.filter(tags__name__iexact=tag)
+    search = request.GET.get("q", "").strip()
+    if search:
+        query = query.filter(
+            Q(code__icontains=search)
+            | Q(destination_url__icontains=search)
+            | Q(title__icontains=search)
+        )
+    page = Paginator(query, 25).get_page(request.GET.get("page"))
+    context = {
+        "page": page,
+        "status": status,
+        "tag": tag,
+        "q": search,
+        "statuses": Link.Status.choices,
+        "tags": Tag.objects.filter(workspace=request.workspace),
+        "has_any": Link.objects.filter(workspace=request.workspace).exists(),
+    }
+    template = (
+        "links/partials/rows.html" if request.headers.get("HX-Request") else "links/list.html"
+    )
+    return render(request, template, context)
+
+
+@require_role()
+@require_GET
+def archive_confirm(request, slug, code):
+    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    return render(
+        request,
+        "partials/confirm.html",
+        {
+            "title": "Archive this link?",
+            "body": f"{services.short_url(link)} stops appearing in the list. "
+            f"Existing clicks are kept and it can be restored.",
+            "action": reverse("links:archive", args=[slug, link.code]),
+            "target": f"#link-{link.pk}",
+            "confirm_label": "Archive",
+        },
+    )
+
+
+@require_role()
+@require_POST
+def archive(request, slug, code):
+    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    services.archive_link(request.membership, link)
+    if request.headers.get("HX-Request"):
+        return render(request, "links/partials/row.html", {"link": link})
+    return redirect("links:list", slug=slug)
+
+
+@require_role()
+@require_POST
+def restore(request, slug, code):
+    link = get_object_or_404(Link, code__iexact=code, workspace=request.workspace)
+    services.restore_link(request.membership, link)
+    if request.headers.get("HX-Request"):
+        return render(request, "links/partials/row.html", {"link": link})
+    return redirect("links:list", slug=slug)

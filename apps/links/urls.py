@@ -13,4 +13,7 @@ urlpatterns = [
     path("routing/", views.routing, name="routing"),
     path("card-preview/", views.card_preview, name="card_preview"),
     path("<str:code>/edit/", views.edit, name="edit"),
+    path("<str:code>/archive/confirm/", views.archive_confirm, name="archive_confirm"),
+    path("<str:code>/archive/", views.archive, name="archive"),
+    path("<str:code>/restore/", views.restore, name="restore"),
 ]

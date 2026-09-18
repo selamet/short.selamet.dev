@@ -1,0 +1,17 @@
+<div id="link-filters" class="mt-6 flex flex-wrap items-center gap-3">
+  <input type="search" name="q" value="{{ q }}" placeholder="Search code, destination or title"
+         class="min-w-[220px] flex-1 rounded-sm border border-line bg-surface-2 px-3 py-2 focus:border-accent focus:outline-none"
+         hx-get="{% url 'links:list' current_workspace.slug %}" hx-trigger="keyup changed delay:300ms"
+         hx-target="#link-rows" hx-swap="outerHTML" hx-include="#link-filters" hx-push-url="true">
+  <select name="status" class="rounded-sm border border-line bg-surface-2 px-3 py-2"
+          hx-get="{% url 'links:list' current_workspace.slug %}" hx-trigger="change"
+          hx-target="#link-rows" hx-swap="outerHTML" hx-include="#link-filters" hx-push-url="true">
+    {% for value, label in statuses %}<option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <select name="tag" class="rounded-sm border border-line bg-surface-2 px-3 py-2"
+          hx-get="{% url 'links:list' current_workspace.slug %}" hx-trigger="change"
+          hx-target="#link-rows" hx-swap="outerHTML" hx-include="#link-filters" hx-push-url="true">
+    <option value="">All tags</option>
+    {% for t in tags %}<option value="{{ t.name }}" {% if t.name == tag %}selected{% endif %}>{{ t.name }}</option>{% endfor %}
+  </select>
+</div>
