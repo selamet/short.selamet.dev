@@ -7,7 +7,7 @@ easy for the analytics issue to swap for a real parser later without touching th
 that calls it.
 """
 
-from apps.redirects.platforms import CRAWLER_TOKENS
+from apps.core.useragents import BOT_TOKENS, CRAWLER_TOKENS
 
 MOBILE_TOKENS = ("iphone", "ipod", "android", "mobile", "windows phone")
 TABLET_TOKENS = ("ipad", "tablet", "kindle", "silk")
@@ -40,16 +40,6 @@ BROWSER_TOKENS = (
     ("python-requests", "python-requests"),
 )
 
-BOT_TOKENS = (
-    "bot",
-    "spider",
-    "crawler",
-    "curl",
-    "wget",
-    "python-requests",
-    "headlesschrome",
-)
-
 
 def device_type(user_agent):
     agent = (user_agent or "").lower()
@@ -73,7 +63,7 @@ def browser(user_agent):
     for token, name in BROWSER_TOKENS:
         if token in agent:
             return name
-    return "Other"
+    return ""
 
 
 def is_bot(user_agent):

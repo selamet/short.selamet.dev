@@ -5,23 +5,7 @@ every click, and the only decisions are iOS versus Android versus everything els
 whether the caller is a social crawler that wants a card instead of a redirect.
 """
 
-CRAWLER_TOKENS = (
-    "facebookexternalhit",
-    "facebookcatalog",
-    "twitterbot",
-    "whatsapp",
-    "slackbot",
-    "linkedinbot",
-    "telegrambot",
-    "discordbot",
-    "pinterest",
-    "redditbot",
-    "embedly",
-    "skypeuripreview",
-    "vkshare",
-    "applebot",
-    "bingpreview",
-)
+from apps.core.useragents import CRAWLER_TOKENS
 
 IOS_TOKENS = ("iphone", "ipad", "ipod")
 

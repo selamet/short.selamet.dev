@@ -34,7 +34,9 @@ def test_record_click_writes_an_event_and_increments_the_counter(link):
     assert event.link_id == link.pk
     assert event.target_platform == "desktop"
     assert event.device_type == "desktop"
-    assert event.browser
+    # DESKTOP_UA carries no recognizable browser token; browser() and
+    # operating_system() agree that "unknown" is "", not a made-up label.
+    assert event.browser == ""
     assert event.referrer_host == "www.instagram.com"
     assert event.utm_source == "instagram"
     assert event.is_bot is False
@@ -58,6 +60,35 @@ def test_the_referrer_query_string_is_dropped(link):
     event = ClickEvent.objects.get()
     assert "secret" not in event.referrer_url
     assert event.referrer_host == "www.instagram.com"
+
+
+@pytest.mark.django_db
+def test_referrer_credentials_are_stripped(link):
+    _record(link, referrer="https://user:secret@example.com/p?t=1#frag")
+    event = ClickEvent.objects.get()
+    assert event.referrer_host == "example.com"
+    assert "user" not in event.referrer_url
+    assert "secret" not in event.referrer_url
+    assert "t=1" not in event.referrer_url
+    assert "frag" not in event.referrer_url
+
+
+@pytest.mark.django_db
+def test_overlong_values_are_truncated_not_dropped(link):
+    long_host = "x" * 300 + ".example.com"
+    long_campaign = "y" * 500
+    _record(
+        link,
+        referrer=f"https://{long_host}/p",
+        query_string=f"utm_campaign={long_campaign}",
+    )
+    event = ClickEvent.objects.get()
+    assert len(event.referrer_host) == ClickEvent._meta.get_field("referrer_host").max_length
+    assert len(event.utm_campaign) == ClickEvent._meta.get_field("utm_campaign").max_length
+    assert event.referrer_host == long_host[: len(event.referrer_host)]
+    assert event.utm_campaign == long_campaign[: len(event.utm_campaign)]
+    link.refresh_from_db()
+    assert link.click_count == 1
 
 
 @pytest.mark.django_db
