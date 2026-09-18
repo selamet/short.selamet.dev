@@ -48,7 +48,20 @@ def _workspace_zone(workspace):
 
 def local_date(event):
     """The calendar date `event.occurred_at` falls on in its workspace's own
-    timezone, falling back to UTC when that timezone cannot be loaded."""
+    timezone, falling back to UTC when that timezone cannot be loaded.
+
+    Reads `event.workspace.timezone` as it is *right now*, not as it was when the
+    event occurred: apply_event() and rebuild() both call this to decide which day's
+    rollup an event belongs to, so a workspace that changes its timezone does not
+    retroactively re-bucket anything already rolled up under the old one -- the days
+    around the change stay split across both timezones' notion of "today," and can
+    disagree with what the new timezone alone would produce for the same raw events.
+    This wave does not re-roll automatically when a timezone changes (see
+    docs/self-hosting.md, "Changing a workspace's timezone"); the repair path is
+    calling apps.analytics.tasks.rebuild_daily_stats for the affected range once the
+    new timezone is in place, which reruns exactly this function against every event
+    in range and rebuilds from what it decides.
+    """
     return event.occurred_at.astimezone(_workspace_zone(event.workspace)).date()
 
 
