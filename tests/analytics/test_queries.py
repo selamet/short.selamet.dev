@@ -260,6 +260,28 @@ def test_leaderboard_limit(dataset):
     assert rows == [{"code": "link-a", "title": "Alpha", "clicks": 21}]
 
 
+@pytest.mark.django_db
+def test_leaderboard_breaks_ties_by_ascending_link_id(owner):
+    # Two links with equal clicks: the query's own tie-break (ORDER BY -clicks,
+    # link_id) puts the lower-pk link first. first_link is created before
+    # second_link, so it has the lower pk; the returned order must match the
+    # query's, not Link's own default ordering (-created_at), which would put
+    # second_link first if the two were ever independently re-sorted in Python.
+    membership = _membership(owner, "tie-workspace")
+    first_link = link_services.create_link(
+        membership, destination_url="https://example.com/first", code="first-link"
+    )
+    second_link = link_services.create_link(
+        membership, destination_url="https://example.com/second", code="second-link"
+    )
+    _stat(first_link, START, clicks=5, unique_clicks=5, bot_clicks=0)
+    _stat(second_link, START, clicks=5, unique_clicks=5, bot_clicks=0)
+
+    rows = queries.leaderboard(membership.workspace, START, END)
+
+    assert [row["code"] for row in rows] == ["first-link", "second-link"]
+
+
 # --- recent_clicks --------------------------------------------------------------------
 
 

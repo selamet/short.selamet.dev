@@ -9,6 +9,7 @@ import pytest
 from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db.models import QuerySet
 
 from apps.analytics import rollups
 from apps.analytics.management.commands import enqueue_scheduled
@@ -181,6 +182,71 @@ def test_expire_links_leaves_healthy_links_alone(link):
 
     link.refresh_from_db()
     assert link.status == Link.Status.ACTIVE
+
+
+@pytest.mark.django_db
+def test_expire_links_never_disables_a_link_without_invalidating_it(
+    membership, monkeypatch, django_capture_on_commit_callbacks
+):
+    """Regression test for a race in the previous implementation: it captured the
+    codes to invalidate with one query, then called due.update(...), which
+    re-evaluated the same expires_at/max_clicks filter as a second statement. A link
+    that only became eligible in the gap between the two (a click landing right as
+    this ran, pushing click_count past max_clicks) would then be swept up by that
+    second, re-evaluated filter and disabled -- without its code ever having been
+    captured, so its cached payload was never invalidated and kept serving stale
+    "active" redirects until the cache entry's own TTL expired.
+
+    Simulated by monkeypatching QuerySet.update itself, at the class level, to land
+    that click the first time anything calls .update() -- which is exactly the
+    disabling update, whichever queryset it ends up being called against -- rather
+    than hooking a call shape (e.g. a `pk__in` kwarg) only the fixed implementation
+    happens to use. This way the same test fails against the old due.update()
+    (which re-evaluates the filter and would disable racing_link too, without ever
+    having captured its code) and passes against the fix.
+    """
+    due_link = link_services.create_link(
+        membership, destination_url="https://example.com/due", code="due-link"
+    )
+    due_link.expires_at = datetime.now(tz=UTC) - timedelta(minutes=1)
+    due_link.save(update_fields=["expires_at"])
+    redirect_cache.set_payload(due_link.code, redirect_cache.payload_from_link(due_link))
+
+    racing_link = link_services.create_link(
+        membership, destination_url="https://example.com/racing", code="racing-link"
+    )
+    racing_link.max_clicks = 5
+    racing_link.click_count = 4
+    racing_link.save(update_fields=["max_clicks", "click_count"])
+    redirect_cache.set_payload(racing_link.code, redirect_cache.payload_from_link(racing_link))
+
+    original_update = QuerySet.update
+    triggered = False
+
+    def racing_update(self, **kwargs):
+        nonlocal triggered
+        if not triggered:
+            triggered = True
+            # The click that crosses max_clicks, landing after `due` was already
+            # read but before the disabling update runs.
+            Link.objects.filter(pk=racing_link.pk).update(click_count=5)
+        return original_update(self, **kwargs)
+
+    monkeypatch.setattr(QuerySet, "update", racing_update)
+
+    with django_capture_on_commit_callbacks(execute=True):
+        expire_links.enqueue()
+
+    due_link.refresh_from_db()
+    racing_link.refresh_from_db()
+    assert due_link.status == Link.Status.DISABLED
+    assert redirect_cache.get_payload(due_link.code) is None
+    # racing_link crossed max_clicks only after expire_links had already decided
+    # what to disable this run: it must be left alone entirely -- both status and
+    # cache -- rather than disabled without its cache invalidated. It is caught on
+    # the next run instead (every 10 minutes -- see docker/crontab).
+    assert racing_link.status == Link.Status.ACTIVE
+    assert redirect_cache.get_payload(racing_link.code) is not None
 
 
 # --- enqueue_scheduled --------------------------------------------------------------------

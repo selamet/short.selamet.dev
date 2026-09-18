@@ -52,6 +52,24 @@ def _clamp_limit(limit):
     return max(1, min(limit, settings.ANALYTICS_QUERY_MAX_LIMIT))
 
 
+def _padded_utc_window(start, end):
+    """The [start, end) range of UTC instants that could contain every event whose
+    local date -- under any workspace timezone offset -- falls somewhere in the
+    inclusive local-date range [start, end]. Padding a full day on each side covers
+    every real-world UTC offset (UTC-12 to UTC+14).
+
+    Shared by hour_weekday_matrix() below and
+    apps.analytics.tasks.rebuild_daily_stats(): both need to scan raw ClickEvent rows
+    by a local, not UTC, date range, and both used to compute this window inline
+    identically; it lives here, in queries.py, because tasks.py can import from
+    queries.py with no cycle (queries.py has no dependency on tasks.py) and this is,
+    at heart, a read concern.
+    """
+    window_start = datetime.combine(start - timedelta(days=1), time.min, tzinfo=UTC)
+    window_end = datetime.combine(end + timedelta(days=2), time.min, tzinfo=UTC)
+    return window_start, window_end
+
+
 def _stat_queryset(workspace, link, start, end):
     query = DailyLinkStat.objects.filter(workspace=workspace, date__gte=start, date__lte=end)
     if link is not None:
@@ -103,12 +121,16 @@ def summary(workspace, link=None, *, start, end, include_bots=False):
 
 
 def time_series(workspace, link=None, *, start, end, granularity="day"):
-    """One point per day, or per ISO week (granularity="week", bucketed by the
-    Monday that starts it) between start and end inclusive, zero-filled for any
-    day/week with no DailyLinkStat row. `clicks` excludes bot clicks, the same
-    default summary() uses; `unique_clicks` always does.
+    """One point per day between start and end inclusive, zero-filled for any day
+    with no DailyLinkStat row. `clicks` excludes bot clicks, the same default
+    summary() uses; `unique_clicks` always does.
+
+    `granularity` only accepts "day" for now. The parameter exists so a coarser mode
+    (e.g. "week") can be added without changing every caller's signature, but no
+    caller needs one yet, and an untested aggregation mode is worse than none --
+    anything else raises rather than silently guessing what a caller wanted.
     """
-    if granularity not in ("day", "week"):
+    if granularity != "day":
         raise ValueError(f"Unsupported granularity: {granularity!r}")
     by_date = {
         row["date"]: row
@@ -116,31 +138,15 @@ def time_series(workspace, link=None, *, start, end, granularity="day"):
             "date", "clicks", "unique_clicks", "bot_clicks"
         )
     }
-    if granularity == "day":
-        points = []
-        day = start
-        while day <= end:
-            row = by_date.get(day)
-            clicks = (row["clicks"] - row["bot_clicks"]) if row else 0
-            unique_clicks = row["unique_clicks"] if row else 0
-            points.append({"date": day, "clicks": clicks, "unique_clicks": unique_clicks})
-            day += timedelta(days=1)
-        return points
-
-    buckets = {}
+    points = []
     day = start
     while day <= end:
-        week_start = day - timedelta(days=day.weekday())
-        bucket = buckets.setdefault(week_start, {"clicks": 0, "unique_clicks": 0})
         row = by_date.get(day)
-        if row:
-            bucket["clicks"] += row["clicks"] - row["bot_clicks"]
-            bucket["unique_clicks"] += row["unique_clicks"]
+        clicks = (row["clicks"] - row["bot_clicks"]) if row else 0
+        unique_clicks = row["unique_clicks"] if row else 0
+        points.append({"date": day, "clicks": clicks, "unique_clicks": unique_clicks})
         day += timedelta(days=1)
-    return [
-        {"date": week_start, "clicks": bucket["clicks"], "unique_clicks": bucket["unique_clicks"]}
-        for week_start, bucket in sorted(buckets.items())
-    ]
+    return points
 
 
 def breakdown(workspace, dimension, link=None, *, start, end, limit=10):
@@ -174,20 +180,32 @@ def breakdown(workspace, dimension, link=None, *, start, end, limit=10):
 
 def leaderboard(workspace, start, end, limit=10):
     """The workspace's top `limit` links by total clicks over [start, end] (bot
-    clicks included, the same as breakdown())."""
+    clicks included, the same as breakdown()). Ties keep the query's own tie-break,
+    ascending link id, so the order is deterministic and stable across calls.
+
+    `rows` (below) already comes back in exactly that order, from ORDER BY -clicks,
+    link_id; the return list is built by walking `rows` in that same order and only
+    using Link.objects.in_bulk() as a lookup table for each row's code/title, rather
+    than fetching Link objects and re-sorting them in Python -- a second sort with a
+    different (or no) tie-break, against a queryset whose own default ordering
+    (Link.Meta: "-created_at") has nothing to do with clicks, previously could and
+    did disagree with the SQL order on a tie.
+    """
     limit = _clamp_limit(limit)
-    rows = (
+    rows = list(
         DailyLinkStat.objects.filter(workspace=workspace, date__gte=start, date__lte=end)
         .values("link_id")
         .annotate(clicks=Sum("clicks"))
         .order_by("-clicks", "link_id")[:limit]
     )
-    clicks_by_link = {row["link_id"]: row["clicks"] for row in rows}
-    links = Link.objects.filter(pk__in=clicks_by_link).only("pk", "code", "title")
-    ordered = sorted(links, key=lambda candidate: -clicks_by_link[candidate.pk])
+    links_by_id = Link.objects.only("pk", "code", "title").in_bulk(row["link_id"] for row in rows)
     return [
-        {"code": candidate.code, "title": candidate.title, "clicks": clicks_by_link[candidate.pk]}
-        for candidate in ordered
+        {
+            "code": links_by_id[row["link_id"]].code,
+            "title": links_by_id[row["link_id"]].title,
+            "clicks": row["clicks"],
+        }
+        for row in rows
     ]
 
 
@@ -220,15 +238,15 @@ def hour_weekday_matrix(workspace, link, start, end):
     """A 7x24 matrix (rows: local weekday, 0=Monday..6=Sunday; columns: local
     hour-of-day, 0-23) of click counts for one link over [start, end].
 
-    Raw ClickEvent rows are queried in a UTC window padded by a day on each side,
-    wide enough to catch every event whose local day could fall in [start, end]
-    under any timezone offset; each candidate is then converted with _zone() and
-    only kept if its local date actually lands in range, the same two-step rollups
-    rebuild_daily_stats() (apps.analytics.tasks) uses for the same reason.
+    Raw ClickEvent rows are queried in a UTC window from _padded_utc_window(), wide
+    enough to catch every event whose local day could fall in [start, end] under any
+    timezone offset; each candidate is then converted with _zone() and only kept if
+    its local date actually lands in range -- the same two-step
+    apps.analytics.tasks.rebuild_daily_stats() uses for the same reason (and the
+    same window helper).
     """
     zone = _zone(workspace)
-    window_start = datetime.combine(start - timedelta(days=1), time.min, tzinfo=UTC)
-    window_end = datetime.combine(end + timedelta(days=2), time.min, tzinfo=UTC)
+    window_start, window_end = _padded_utc_window(start, end)
     matrix = [[0] * 24 for _ in range(7)]
     events = ClickEvent.objects.filter(
         workspace=workspace, link=link, occurred_at__gte=window_start, occurred_at__lt=window_end

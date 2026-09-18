@@ -7,7 +7,7 @@ and `city` arrive already resolved, as two short strings.
 """
 
 import logging
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -22,6 +22,7 @@ from apps.links.models import Link
 
 from . import rollups, useragent
 from .models import ClickEvent, DailyClickIdentity
+from .queries import _padded_utc_window
 
 logger = logging.getLogger(__name__)
 
@@ -157,12 +158,13 @@ def rebuild_daily_stats(day=None):
     Each workspace picks its own timezone (Workspace.timezone), so which raw
     ClickEvent rows actually fall on `day` differs link by link. Rather than
     duplicating that per-workspace conversion here, this scans every event in a
-    window wide enough to cover any timezone offset and asks rollups.local_date()
-    -- the same function apply_event() itself uses -- which day each one lands on.
+    window wide enough to cover any timezone offset (see
+    apps.analytics.queries._padded_utc_window, shared with hour_weekday_matrix()
+    there) and asks rollups.local_date() -- the same function apply_event() itself
+    uses -- which day each one lands on.
     """
     day = _coerce_day(day) or (timezone.now().date() - timedelta(days=1))
-    window_start = datetime.combine(day - timedelta(days=1), time.min, tzinfo=UTC)
-    window_end = datetime.combine(day + timedelta(days=2), time.min, tzinfo=UTC)
+    window_start, window_end = _padded_utc_window(day, day)
     candidates = ClickEvent.objects.filter(
         occurred_at__gte=window_start, occurred_at__lt=window_end
     ).select_related("workspace")
@@ -235,15 +237,30 @@ def expire_links():
     apps.links.services.invalidate_cache rather than reaching into the redirect
     cache directly, so this stays the one place that knows how that cache entry
     gets cleared.
+
+    The primary keys of the links to disable are captured first, then the UPDATE is
+    issued against exactly that list (`pk__in`), never by re-running the
+    expires_at/max_clicks filter a second time. Re-running it would race: a link
+    that only becomes eligible in the gap between the two statements (a click
+    landing right as this runs, pushing click_count past max_clicks) would then be
+    disabled by an update() that re-evaluated the filter, without its code ever
+    having been captured for invalidate_cache -- disabled, but still serving its
+    old cached payload until the cache entry's own TTL expires. Scoping the update
+    to the captured primary keys instead means exactly the links that get disabled
+    are exactly the ones invalidated, every time; a link that turns eligible mid-run
+    is simply left for the next run (this job runs every 10 minutes, see
+    docker/crontab) rather than raced.
     """
     now = timezone.now()
     with transaction.atomic():
         due = Link.objects.filter(status=Link.Status.ACTIVE).filter(
             Q(expires_at__lt=now) | Q(max_clicks__isnull=False, click_count__gte=F("max_clicks"))
         )
-        codes = list(due.values_list("code", flat=True))
-        updated = due.update(status=Link.Status.DISABLED)
-    if not codes:
-        return
+        pks_and_codes = list(due.values_list("pk", "code"))
+        if not pks_and_codes:
+            return
+        pks = [pk for pk, _code in pks_and_codes]
+        codes = [code for _pk, code in pks_and_codes]
+        updated = Link.objects.filter(pk__in=pks).update(status=Link.Status.DISABLED)
     link_services.invalidate_cache(*codes)
     logger.info("expire_links disabled=%d", updated)
